@@ -2,27 +2,37 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, ShoppingCart, ChevronDown, MapPin } from "lucide-react";
+import { Search, ShoppingCart, ChevronDown, User, LogOut, Check } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { logout } from "@/redux/slices/authSlice";
+import { openAddressModal } from "@/redux/slices/addressSlice";
 
 export interface HeaderProps {
-  deliveryTime?: string;
-  address?: string;
-  onAddressClick?: () => void;
-  onLoginClick?: () => void;
   onCartClick?: () => void;
-  cartItemCount?: number;
 }
 
-export default function Header({
-  deliveryTime = "18 minutes",
-  address = "O-91, O Pocket, Pocket O, Phas...",
-  onAddressClick,
-  onLoginClick,
-  onCartClick,
-  cartItemCount = 0,
-}: HeaderProps) {
+export default function Header({ onCartClick }: HeaderProps) {
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { totalCount, totalPrice } = useAppSelector((state) => state.cart);
+  const { currentAddress } = useAppSelector((state) => state.address);
+
   const [searchInput, setSearchInput] = useState("");
-  const searchPlaceholders = ['Search "egg"', 'Search "milk"', 'Search "bread"', 'Search "chips"', 'Search "curd"'];
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const searchPlaceholders = [
+    'Search "egg"',
+    'Search "milk"',
+    'Search "bread"',
+    'Search "chips"',
+    'Search "atta"',
+    'Search "curd"',
+  ];
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   // Subtle animated cycling search placeholder matching quick commerce experience
@@ -33,13 +43,22 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
+  const handleLogout = () => {
+    dispatch(logout());
+    setUserDropdownOpen(false);
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-slate-200/70 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       <div className="w-[90%] mx-auto h-20 flex items-center justify-between gap-4 sm:gap-8">
         
         {/* ── 1. Brand Logo (BhansaMart) ── */}
         <div className="flex items-center gap-6 shrink-0">
-          <Link href="/" className="flex items-center select-none group focus:outline-none shrink-0" title="BhansaMart">
+          <Link
+            href="/"
+            className="flex items-center select-none group focus:outline-none shrink-0"
+            title="BhansaMart"
+          >
             <img
               src="/images/bhansamart-logo.png"
               alt="BhansaMart"
@@ -49,17 +68,19 @@ export default function Header({
 
           {/* ── 2. Location & Delivery Time Selector ── */}
           <div
-            onClick={onAddressClick}
+            onClick={() => dispatch(openAddressModal())}
             className="hidden md:flex flex-col text-left cursor-pointer select-none group border-l border-slate-200/80 pl-6 min-w-[210px] max-w-[260px]"
             title="Change Delivery Location"
           >
             <div className="flex items-center gap-1">
               <span className="font-extrabold text-[13px] sm:text-sm text-slate-900 leading-tight">
-                Delivery in {deliveryTime}
+                Delivery in 15-25 minutes
               </span>
             </div>
             <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-normal leading-tight mt-0.5 group-hover:text-slate-800 transition">
-              <span className="truncate max-w-[195px]">{address}</span>
+              <span className="truncate max-w-[195px]">
+                {currentAddress.addressLine}
+              </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-700 shrink-0 stroke-[2.5]" />
             </div>
           </div>
@@ -79,23 +100,64 @@ export default function Header({
           </div>
         </div>
 
-        {/* ── 4. Right Actions: Login & My Cart ── */}
-        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-          {/* Login Link */}
-          <button
-            type="button"
-            onClick={onLoginClick}
-            className="text-xs sm:text-sm font-semibold text-slate-800 hover:text-black px-2 sm:px-3 py-2 transition focus:outline-none cursor-pointer"
-          >
-            Login
-          </button>
+        {/* ── 4. Right Actions: User Account & Cart ── */}
+        <div className="flex items-center gap-3 sm:gap-6 shrink-0 relative">
+          
+          {/* User Account State */}
+          {mounted && isAuthenticated && user ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 hover:text-emerald-700 px-3 py-2 rounded-xl hover:bg-slate-50 transition focus:outline-none cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-extrabold">
+                  {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <span className="hidden lg:inline-block max-w-[100px] truncate">
+                  {user.name}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {/* User Dropdown Menu */}
+              {userDropdownOpen ? (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-900 truncate">{user.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
+                    {user.rewardPoints !== undefined ? (
+                      <p className="text-[10px] font-semibold text-emerald-700 mt-1">
+                        🎁 {user.rewardPoints} Reward Points
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-xs sm:text-sm font-semibold text-slate-800 hover:text-[#0C831F] px-2 sm:px-3 py-2 transition focus:outline-none cursor-pointer"
+            >
+              Login
+            </Link>
+          )}
 
           {/* My Cart Button */}
           <button
             type="button"
             onClick={onCartClick}
             className={`flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs focus:outline-none cursor-pointer active:scale-95 ${
-              cartItemCount > 0
+              mounted && totalCount > 0
                 ? "bg-[#0C831F] text-white hover:bg-[#0a6f1a]"
                 : "bg-[#D6D9DD] hover:bg-[#C2C6CC] text-white"
             }`}
@@ -103,7 +165,7 @@ export default function Header({
           >
             <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.4} />
             <span className="whitespace-nowrap">
-              {cartItemCount > 0 ? `${cartItemCount} items` : "My Cart"}
+              {mounted && totalCount > 0 ? `${totalCount} items • ₹${totalPrice}` : "My Cart"}
             </span>
           </button>
         </div>
