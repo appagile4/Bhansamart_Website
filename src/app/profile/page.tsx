@@ -1078,7 +1078,6 @@ function ProfileContent() {
   const dispatch = useAppDispatch();
   const { user, token } = useAppSelector((state) => state.auth);
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ── 1. My Orders State ──
   const [orders, setOrders] = useState<UserOrder[]>([
@@ -1295,12 +1294,9 @@ function ProfileContent() {
   }, [token, dispatch]);
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     try {
       await dispatch(fetchCurrentUser());
-    } finally {
-      setIsRefreshing(false);
-    }
+    } catch {}
   };
 
   const handleLogout = () => {
