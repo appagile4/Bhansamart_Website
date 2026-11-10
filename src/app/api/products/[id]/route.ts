@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 export async function GET(
   _req: NextRequest,
@@ -13,10 +14,7 @@ export async function GET(
     );
   }
 
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
+  const backendUrl = getBackendApiUrl();
 
   try {
     const controller = new AbortController();

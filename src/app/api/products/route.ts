@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ProductItem } from "@/components/ProductCard";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 // Fallback products by location in case backend is starting or offline
 const LOCATION_FALLBACKS: Record<string, ProductItem[]> = {
@@ -262,10 +263,7 @@ const LOCATION_FALLBACKS: Record<string, ProductItem[]> = {
 };
 
 export async function GET(req: NextRequest) {
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
+  const backendUrl = getBackendApiUrl();
   const { searchParams } = new URL(req.url);
 
   const lat = searchParams.get("lat") || searchParams.get("latitude");
