@@ -236,7 +236,7 @@ export default function Footer() {
         <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Copyright */}
           <div className="text-xs text-slate-500 font-medium">
-            © Blink Commerce Private Limited, 2016-2026
+            © BhansaMart Commerce Private Limited, 2016-2026
           </div>
 
           {/* Download App Buttons */}
@@ -347,7 +347,7 @@ export default function Footer() {
 
         {/* ── Disclaimer Line ── */}
         <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
-          &quot;Blinkit&quot; is owned &amp; managed by &quot;Blink Commerce Private Limited&quot; and is not related, linked or interconnected in whatsoever manner or nature, to &quot;GROFFR.COM&quot; which is a real estate services business operated by &quot;Redstone Consultancy Services Private Limited&quot;.
+          &quot;BhansaMart&quot; is owned &amp; managed by &quot;BhansaMart Commerce Private Limited&quot; and is committed to delivering 100% fresh groceries, daily essentials, and kitchen staples to your doorstep in 15-25 minutes.
         </p>
 
       </div>
