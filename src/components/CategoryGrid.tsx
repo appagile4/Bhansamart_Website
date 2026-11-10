@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 export interface CategoryItem {
   _id?: string;
@@ -39,14 +38,12 @@ const INITIAL_CATEGORIES: CategoryItem[] = [
 
 export default function CategoryGrid() {
   const [categories, setCategories] = useState<CategoryItem[]>(INITIAL_CATEGORIES);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function fetchCategories() {
       try {
-        setLoading(true);
         // 1. Try Next.js API / Backend route
         const res = await fetch("/api/categories");
         if (res.ok) {
@@ -63,8 +60,6 @@ export default function CategoryGrid() {
         }
       } catch (err) {
         console.warn("Failed to fetch live categories from backend, using fallback:", err);
-      } finally {
-        if (isMounted) setLoading(false);
       }
     }
 

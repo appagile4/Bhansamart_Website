@@ -10,9 +10,10 @@ interface CartState {
   items: Record<string, CartItem>;
   totalCount: number;
   totalPrice: number;
+  isCartOpen: boolean;
 }
 
-const loadInitialCart = (): CartState => {
+const loadInitialCart = (): { items: Record<string, CartItem>; totalCount: number; totalPrice: number } => {
   if (typeof window !== "undefined") {
     try {
       const stored = localStorage.getItem("bhansa_cart");
@@ -51,6 +52,7 @@ const initialState: CartState = {
   items: {},
   totalCount: 0,
   totalPrice: 0,
+  isCartOpen: false,
 };
 
 export const cartSlice = createSlice({
@@ -62,6 +64,15 @@ export const cartSlice = createSlice({
       state.items = loaded.items;
       state.totalCount = loaded.totalCount;
       state.totalPrice = loaded.totalPrice;
+    },
+    openCart: (state) => {
+      state.isCartOpen = true;
+    },
+    closeCart: (state) => {
+      state.isCartOpen = false;
+    },
+    toggleCart: (state) => {
+      state.isCartOpen = !state.isCartOpen;
     },
     addToCart: (state, action: PayloadAction<ProductItem>) => {
       const product = action.payload;
@@ -125,7 +136,15 @@ export const cartSlice = createSlice({
   },
 });
 
-export const { initializeCart, addToCart, removeFromCart, updateQuantity, clearCart } =
-  cartSlice.actions;
+export const {
+  initializeCart,
+  openCart,
+  closeCart,
+  toggleCart,
+  addToCart,
+  removeFromCart,
+  updateQuantity,
+  clearCart,
+} = cartSlice.actions;
 
 export default cartSlice.reducer;

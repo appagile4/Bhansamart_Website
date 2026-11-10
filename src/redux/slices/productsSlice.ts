@@ -51,8 +51,10 @@ export const fetchProducts = createAsyncThunk(
         eligibleVendorsCount: data.eligibleVendorsCount ?? 0,
         isOutsideDeliveryZone: Boolean(data.isOutsideDeliveryZone && (data.products || []).length === 0),
       };
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Network error loading products");
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error loading products"
+      );
     }
   }
 );

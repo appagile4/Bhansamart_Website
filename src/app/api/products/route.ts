@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ProductItem } from "@/components/ProductCard";
 
 // Fallback products by location in case backend is starting or offline
-const LOCATION_FALLBACKS: Record<string, any[]> = {
+const LOCATION_FALLBACKS: Record<string, ProductItem[]> = {
   delhi: [
     {
       _id: "p1",
@@ -261,7 +262,10 @@ const LOCATION_FALLBACKS: Record<string, any[]> = {
 };
 
 export async function GET(req: NextRequest) {
-  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000/api";
+  const backendUrl =
+    process.env.BACKEND_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://bhansamart.webstudiomatrix.com/api";
   const { searchParams } = new URL(req.url);
 
   const lat = searchParams.get("lat") || searchParams.get("latitude");
@@ -273,7 +277,7 @@ export async function GET(req: NextRequest) {
   // 1. Try to fetch from active Express Backend
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const queryStr = searchParams.toString();
     const targetUrl = `${backendUrl}/products${queryStr ? `?${queryStr}` : ""}`;

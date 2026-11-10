@@ -6,6 +6,7 @@ import HeroBanner from "@/components/HeroBanner";
 import CategoryGrid from "@/components/CategoryGrid";
 import NearbyProducts from "@/components/NearbyProducts";
 import AddressModal from "@/components/AddressModal";
+import CartDrawer from "@/components/CartDrawer";
 
 export default function Home() {
   return (
@@ -27,6 +28,9 @@ export default function Home() {
 
       {/* ── 3. Address Selection Modal ── */}
       <AddressModal />
+
+      {/* ── 4. Global Sliding Cart Drawer (Right to Left) ── */}
+      <CartDrawer />
     </div>
   );
 }

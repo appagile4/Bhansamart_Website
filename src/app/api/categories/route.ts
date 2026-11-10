@@ -25,11 +25,14 @@ const FALLBACK_CATEGORIES = [
 ];
 
 export async function GET() {
-  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000/api";
+  const backendUrl =
+    process.env.BACKEND_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://bhansamart.webstudiomatrix.com/api";
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     const res = await fetch(`${backendUrl}/categories`, {
       signal: controller.signal,

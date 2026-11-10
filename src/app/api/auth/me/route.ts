@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000/api";
+  const backendUrl =
+    process.env.BACKEND_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://bhansamart.webstudiomatrix.com/api";
   const authHeader = req.headers.get("Authorization");
 
   if (!authHeader) {
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
       {
         success: false,

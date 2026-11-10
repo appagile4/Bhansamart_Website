@@ -4,6 +4,8 @@ export interface UserProfile {
   _id: string;
   name: string;
   email: string;
+  phone?: string;
+  avatar?: string;
   role?: string;
   address?: string;
   dateOfBirth?: string;
@@ -53,8 +55,10 @@ export const loginUser = createAsyncThunk(
       }
 
       return data.data;
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Network error logging in");
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error logging in"
+      );
     }
   }
 );
@@ -71,6 +75,7 @@ export const registerUser = createAsyncThunk(
       dateOfBirth: string;
       gender: string;
       address?: string;
+      phone?: string;
       referralCode?: string;
     },
     { rejectWithValue }
@@ -93,8 +98,10 @@ export const registerUser = createAsyncThunk(
       }
 
       return data.data;
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Network error during registration");
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error during registration"
+      );
     }
   }
 );
@@ -104,7 +111,8 @@ export const fetchCurrentUser = createAsyncThunk(
   "auth/fetchCurrentUser",
   async (_, { rejectWithValue }) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
       if (!token) return rejectWithValue("No token saved");
 
       const res = await fetch("/api/auth/me", {
@@ -115,17 +123,133 @@ export const fetchCurrentUser = createAsyncThunk(
       });
       const data = await res.json();
 
-      if (!res.ok || !data.success) {
+      if (res.status === 401) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("bhansa_token");
           localStorage.removeItem("bhansa_user");
         }
-        return rejectWithValue(data.message || "Session expired");
+        return rejectWithValue("Session expired. Please log in again.");
       }
 
-      return { user: data.data, token };
-    } catch (err: any) {
-      return rejectWithValue(err.message || "Failed to load user profile");
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Failed to load user profile");
+      }
+
+      const realUser: UserProfile = data.data?.user || data.data;
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bhansa_user", JSON.stringify(realUser));
+      }
+
+      return { user: realUser, token };
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Failed to load user profile"
+      );
+    }
+  }
+);
+
+// Async thunk for updating user profile
+export const updateProfile = createAsyncThunk(
+  "auth/updateProfile",
+  async (
+    profileData: {
+      name?: string;
+      gender?: string;
+      dateOfBirth?: string;
+      address?: string;
+      phone?: string;
+      avatar?: string;
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const token =
+        state.auth.token ||
+        (typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null);
+      if (!token) return rejectWithValue("Authentication required. Please login.");
+
+      const res = await fetch("/api/auth/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        return rejectWithValue(
+          data.message || data.errors?.[0] || "Failed to update profile"
+        );
+      }
+
+      // Merge updated fields
+      const updatedUser: UserProfile = {
+        ...(state.auth.user || ({} as UserProfile)),
+        ...(data.data?.user || {}),
+        ...(profileData.phone ? { phone: profileData.phone } : {}),
+        ...(profileData.avatar ? { avatar: profileData.avatar } : {}),
+        ...(profileData.name ? { name: profileData.name } : {}),
+        ...(profileData.gender ? { gender: profileData.gender } : {}),
+        ...(profileData.dateOfBirth ? { dateOfBirth: profileData.dateOfBirth } : {}),
+      };
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bhansa_user", JSON.stringify(updatedUser));
+      }
+
+      return updatedUser;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error updating profile"
+      );
+    }
+  }
+);
+
+// Async thunk for changing account password
+export const changeUserPassword = createAsyncThunk(
+  "auth/changePassword",
+  async (
+    payload: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    },
+    { getState, rejectWithValue }
+  ) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const token =
+        state.auth.token ||
+        (typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null);
+      if (!token) return rejectWithValue("Authentication required. Please login.");
+
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        return rejectWithValue(
+          data.message || data.errors?.[0] || "Failed to change password"
+        );
+      }
+
+      return data.message || "Password changed successfully";
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error changing password"
+      );
     }
   }
 );
@@ -138,15 +262,24 @@ export const authSlice = createSlice({
       if (typeof window !== "undefined") {
         const token = localStorage.getItem("bhansa_token");
         const userStr = localStorage.getItem("bhansa_user");
-        if (token && userStr) {
-          try {
-            state.token = token;
-            state.user = JSON.parse(userStr);
-            state.isAuthenticated = true;
-          } catch {
-            localStorage.removeItem("bhansa_token");
-            localStorage.removeItem("bhansa_user");
+        if (token) {
+          state.token = token;
+          state.isAuthenticated = true;
+          if (userStr) {
+            try {
+              state.user = JSON.parse(userStr);
+            } catch {
+              localStorage.removeItem("bhansa_user");
+            }
           }
+        }
+      }
+    },
+    updateLocalUser: (state, action: PayloadAction<Partial<UserProfile>>) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        if (typeof window !== "undefined") {
+          localStorage.setItem("bhansa_user", JSON.stringify(state.user));
         }
       }
     },
@@ -205,18 +338,59 @@ export const authSlice = createSlice({
 
     // Fetch Profile
     builder
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
       })
-      .addCase(fetchCurrentUser.rejected, (state) => {
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
+      .addCase(fetchCurrentUser.rejected, (state, action) => {
+        state.loading = false;
+        if (action.payload === "Session expired. Please log in again.") {
+          state.user = null;
+          state.token = null;
+          state.isAuthenticated = false;
+        }
+      });
+
+    // Update Profile
+    builder
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.successMessage = "Profile updated successfully";
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Failed to update profile";
+      });
+
+    // Change Password
+    builder
+      .addCase(changeUserPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(changeUserPassword.fulfilled, (state, action) => {
+        state.loading = false;
+        state.successMessage = (action.payload as string) || "Password changed successfully";
+      })
+      .addCase(changeUserPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Failed to change password";
       });
   },
 });
 
-export const { initializeAuth, logout, clearAuthError } = authSlice.actions;
+export const { initializeAuth, logout, clearAuthError, updateLocalUser } = authSlice.actions;
 export default authSlice.reducer;

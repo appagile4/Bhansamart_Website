@@ -1,11 +1,23 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Search, ShoppingCart, ChevronDown, User, LogOut, Check } from "lucide-react";
+import { Search, ShoppingCart, ChevronDown, User, LogOut, BookOpen, Package } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logout } from "@/redux/slices/authSlice";
 import { openAddressModal } from "@/redux/slices/addressSlice";
+import { openCart } from "@/redux/slices/cartSlice";
+
+const emptySubscribe = () => () => {};
+
+const SEARCH_PLACEHOLDERS = [
+  'Search "egg"',
+  'Search "milk"',
+  'Search "bread"',
+  'Search "chips"',
+  'Search "atta"',
+  'Search "curd"',
+];
 
 export interface HeaderProps {
   onCartClick?: () => void;
@@ -19,26 +31,18 @@ export default function Header({ onCartClick }: HeaderProps) {
 
   const [searchInput, setSearchInput] = useState("");
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const searchPlaceholders = [
-    'Search "egg"',
-    'Search "milk"',
-    'Search "bread"',
-    'Search "chips"',
-    'Search "atta"',
-    'Search "curd"',
-  ];
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   // Subtle animated cycling search placeholder matching quick commerce experience
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % searchPlaceholders.length);
+      setPlaceholderIndex((prev) => (prev + 1) % SEARCH_PLACEHOLDERS.length);
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -94,7 +98,7 @@ export default function Header({ onCartClick }: HeaderProps) {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder={searchPlaceholders[placeholderIndex]}
+              placeholder={SEARCH_PLACEHOLDERS[placeholderIndex]}
               className="w-full bg-transparent pl-11 pr-4 py-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 font-normal outline-none"
             />
           </div>
@@ -132,6 +136,34 @@ export default function Header({ onCartClick }: HeaderProps) {
                       </p>
                     ) : null}
                   </div>
+
+                  <Link
+                    href="/profile"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="w-full px-4 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition"
+                  >
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span>My Profile</span>
+                  </Link>
+
+                  <Link
+                    href="/profile?tab=address"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="w-full px-4 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Address Book</span>
+                  </Link>
+
+                  <Link
+                    href="/profile?tab=orders"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="w-full px-4 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition border-b border-slate-100 pb-2.5"
+                  >
+                    <Package className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Your Orders</span>
+                  </Link>
+
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -155,7 +187,7 @@ export default function Header({ onCartClick }: HeaderProps) {
           {/* My Cart Button */}
           <button
             type="button"
-            onClick={onCartClick}
+            onClick={onCartClick || (() => dispatch(openCart()))}
             className={`flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs focus:outline-none cursor-pointer active:scale-95 ${
               mounted && totalCount > 0
                 ? "bg-[#0C831F] text-white hover:bg-[#0a6f1a]"

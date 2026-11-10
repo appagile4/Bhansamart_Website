@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { registerUser, clearAuthError } from "@/redux/slices/authSlice";
-import { Eye, EyeOff, Lock, Mail, User, Calendar, MapPin, Tag, ArrowLeft, AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,18 +14,15 @@ export default function RegisterPage() {
     (state) => state.auth
   );
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    dateOfBirth: "2000-01-01",
-    gender: "Male",
-    address: "",
-    referralCode: "",
-  });
-
-  const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [birthMonth, setBirthMonth] = useState("01");
+  const [birthDay, setBirthDay] = useState("01");
+  const [birthYear, setBirthYear] = useState("2000");
+  const [gender, setGender] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -36,292 +33,298 @@ export default function RegisterPage() {
     if (isAuthenticated) {
       const timer = setTimeout(() => {
         router.push("/");
-      }, 800);
+      }, 700);
       return () => clearTimeout(timer);
     }
   }, [isAuthenticated, router]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
-    if (!formData.name.trim()) {
-      setFormError("Full name is required");
+    if (!name.trim()) {
+      setFormError("Please enter your name");
       return;
     }
-    if (!formData.email.trim()) {
-      setFormError("Valid email is required");
+    if (!email.trim()) {
+      setFormError("Please enter a valid email");
       return;
     }
-    if (formData.password.length < 8) {
+    if (!gender) {
+      setFormError("Please select your gender");
+      return;
+    }
+    if (password.length < 8) {
       setFormError("Password must be at least 8 characters long");
       return;
     }
-    if (!/[A-Z]/.test(formData.password) || !/[a-z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
-      setFormError("Password must contain at least one uppercase letter, one lowercase letter, and one number");
+    if (
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[\W_]/.test(password)
+    ) {
+      setFormError(
+        "Password must contain an uppercase letter, lowercase letter, number, and special character"
+      );
       return;
     }
-    if (formData.password !== formData.confirmPassword) {
-      setFormError("Passwords do not match");
-      return;
-    }
-    if (!formData.dateOfBirth) {
-      setFormError("Date of birth is required");
+    if (password !== confirmPassword) {
+      setFormError("Confirm password does not match password");
       return;
     }
 
+    const dateOfBirth = `${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`;
+
     dispatch(
       registerUser({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        address: formData.address.trim() || undefined,
-        referralCode: formData.referralCode.trim() || undefined,
+        name: name.trim(),
+        email: email.trim(),
+        address: address.trim() || undefined,
+        dateOfBirth,
+        gender,
+        password,
+        confirmPassword,
       })
     );
   };
 
+  const months = [
+    { label: "January", value: "01" },
+    { label: "February", value: "02" },
+    { label: "March", value: "03" },
+    { label: "April", value: "04" },
+    { label: "May", value: "05" },
+    { label: "June", value: "06" },
+    { label: "July", value: "07" },
+    { label: "August", value: "08" },
+    { label: "September", value: "09" },
+    { label: "October", value: "10" },
+    { label: "November", value: "11" },
+    { label: "December", value: "12" },
+  ];
+
+  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const years = Array.from({ length: 70 }, (_, i) => String(2020 - i));
+
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      
-      {/* ── Return to store ── */}
-      <div className="w-full max-w-lg mb-4 flex items-center justify-between">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Store</span>
-        </Link>
-      </div>
-
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-[0_4px_25px_rgba(0,0,0,0.06)] border border-slate-200/80 p-8 sm:p-10">
+    <div className="min-h-screen bg-white flex flex-col justify-center items-center py-10 px-4 sm:px-6 font-sans">
+      <div className="w-full max-w-[440px] mx-auto flex flex-col items-center">
         
-        {/* ── Brand Logo & Header ── */}
-        <div className="text-center mb-6">
-          <Link href="/" className="inline-block mb-3">
-            <img
-              src="/images/bhansamart-logo.png"
-              alt="BhansaMart"
-              className="h-12 w-auto mx-auto object-contain"
-            />
-          </Link>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Create Your Account
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Join BhansaMart for 15-25 min grocery delivery at everyday low prices
-          </p>
-        </div>
+        {/* ── BhansaMart Cart Logo ── */}
+        <Link href="/" className="mb-5 focus:outline-none" title="BhansaMart Home">
+          <img
+            src="/images/bhansamart-cart-logo.png"
+            alt="BhansaMart"
+            className="h-20 w-auto object-contain"
+          />
+        </Link>
 
-        {/* ── Feedback Alerts ── */}
+        {/* ── Create an Account Title ── */}
+        <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight text-center mb-6">
+          Create an Account
+        </h1>
+
+        {/* ── Alerts ── */}
         {formError || error ? (
-          <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+          <div className="w-full mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
             <span>{formError || error}</span>
           </div>
         ) : null}
 
         {successMessage ? (
-          <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5">
+          <div className="w-full mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
             <span>{successMessage}! Redirecting to store...</span>
           </div>
         ) : null}
 
-        {/* ── Registration Form ── */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ── Registration Form (Clean Underlined Style) ── */}
+        <form onSubmit={handleSubmit} className="w-full space-y-4">
           
-          {/* Full Name */}
+          {/* Name */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Full Name *
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="e.g. Rahul Sharma"
-                required
-                className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-              />
-            </div>
+            <label className="block text-xs text-slate-600 mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              required
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[#0B4D58] transition"
+            />
           </div>
 
-          {/* Email Address */}
+          {/* Email */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Email Address *
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="name@example.com"
-                required
-                className="w-full pl-10 pr-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-              />
-            </div>
+            <label className="block text-xs text-slate-600 mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email address"
+              required
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[#0B4D58] transition"
+            />
           </div>
 
-          {/* Gender & DOB Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Gender *
-              </label>
+          {/* Address */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. Baneshwor, Kathmandu / Dwarka, Delhi"
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[#0B4D58] transition"
+            />
+          </div>
+
+          {/* Date of birth (Month, Day, Year Dropdowns) */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Date of birth</label>
+            <div className="grid grid-cols-3 gap-3">
               <select
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:border-[#0B4D58] cursor-pointer"
               >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-                <option value="Prefer not to say">Prefer not to say</option>
+                {months.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={birthDay}
+                onChange={(e) => setBirthDay(e.target.value)}
+                className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:border-[#0B4D58] cursor-pointer"
+              >
+                {days.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:border-[#0B4D58] cursor-pointer"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Date of Birth *
-              </label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  required
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-                />
-              </div>
-            </div>
           </div>
 
-          {/* Passwords */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Password *
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Min 8 chars, 1 Uppercase, 1 Num"
-                  required
-                  className="w-full pl-9 pr-9 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Confirm Password *
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Re-enter password"
-                  required
-                  className="w-full pl-9 pr-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-                />
-              </div>
-            </div>
+          {/* Gender */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Gender</label>
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              required
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 bg-white focus:outline-none focus:border-[#0B4D58] cursor-pointer"
+            >
+              <option value="" disabled>
+                Select Gender
+              </option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
           </div>
 
-          {/* Delivery Address & Referral Code */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Default Address (Optional)
-              </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="e.g. Dwarka, New Delhi"
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Referral Code (Optional)
-              </label>
-              <div className="relative">
-                <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                <input
-                  type="text"
-                  name="referralCode"
-                  value={formData.referralCode}
-                  onChange={handleChange}
-                  placeholder="e.g. BHANSA2026"
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0C831F]/20 focus:border-[#0C831F] transition"
-                />
-              </div>
-            </div>
+          {/* Password */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min 8 chars, 1 uppercase, 1 lowercase, 1 special char"
+              required
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[#0B4D58] transition"
+            />
           </div>
 
-          {/* Submit Button */}
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Confirm Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              required
+              className="w-full pb-2 border-b border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-[#0B4D58] transition"
+            />
+          </div>
+
+          {/* Sign up Button (Dark Teal) */}
           <button
             type="submit"
             disabled={loading || isAuthenticated}
-            className="w-full mt-3 py-3.5 bg-[#0C831F] hover:bg-[#0a6f1a] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none"
+            className="w-full py-3.5 bg-[#0B4D58] hover:bg-[#083C45] active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none mt-4"
           >
             {loading ? (
               <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : null}
-            <span>{loading ? "Creating Account..." : "Create Free Account"}</span>
+            <span>{loading ? "Creating Account..." : "Sign up"}</span>
           </button>
         </form>
 
-        {/* ── Switch to Login ── */}
-        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-500">
-            Already have a BhansaMart account?{" "}
-            <Link
-              href="/login"
-              className="font-bold text-[#0C831F] hover:underline"
-            >
-              Log In
-            </Link>
-          </p>
+        {/* ── OR Divider ── */}
+        <div className="w-full flex items-center my-4">
+          <div className="flex-1 border-t border-slate-200" />
+          <span className="px-3 text-xs text-slate-400 font-medium">OR</span>
+          <div className="flex-1 border-t border-slate-200" />
         </div>
+
+        {/* ── Sign up with Google ── */}
+        <button
+          type="button"
+          onClick={() => alert("Google Sign Up: You can sign up with email and password.")}
+          className="w-full py-3 px-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 flex items-center justify-center gap-3 transition shadow-xs focus:outline-none cursor-pointer"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+          <span>Sign up with Google</span>
+        </button>
+
+        {/* ── Switch to Sign in ── */}
+        <p className="text-xs text-slate-600 mt-5 text-center">
+          Already have an Account?{" "}
+          <Link
+            href="/login"
+            className="font-bold text-[#0B4D58] hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );
