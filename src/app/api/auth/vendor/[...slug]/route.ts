@@ -9,37 +9,48 @@ async function proxyVendorAuth(
     const { slug } = await context.params;
     const path = slug.join("/");
     const backendUrl = getBackendApiUrl();
-    const search = req.nextUrl.searchParams.toString();
-    const query = search ? `?${search}` : "";
+    const query = new URL(req.url).search;
     const url = `${backendUrl}/auth/vendor/${path}${query}`;
 
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== "host") {
-        headers[key] = value;
-      }
-    });
-
-    const options: RequestInit = {
-      method: req.method,
-      headers,
+    const authHeader = req.headers.get("authorization");
+    const headers: Record<string, string> = {
+      Accept: "application/json, text/plain, */*",
     };
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    }
+
+    const contentType = req.headers.get("content-type") || "";
+    let body: any = undefined;
 
     if (req.method !== "GET" && req.method !== "HEAD") {
-      const contentType = req.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
-        options.body = JSON.stringify(await req.json());
+        headers["Content-Type"] = "application/json";
+        const jsonBody = await req.json().catch(() => null);
+        if (jsonBody !== null) {
+          body = JSON.stringify(jsonBody);
+        }
       } else if (contentType.includes("multipart/form-data")) {
-        options.body = await req.formData();
-      } else {
-        options.body = await req.text();
+        // Do not set Content-Type header so fetch can set boundary automatically
+        body = await req.formData();
+      } else if (contentType.includes("application/x-www-form-urlencoded")) {
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        body = await req.text();
+      } else if (contentType) {
+        headers["Content-Type"] = contentType;
+        body = await req.text();
       }
     }
 
-    const res = await fetch(url, options);
-    const contentType = res.headers.get("content-type") || "";
+    const res = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+    });
 
-    if (contentType.includes("application/json")) {
+    const resContentType = res.headers.get("content-type") || "";
+
+    if (resContentType.includes("application/json")) {
       const data = await res.json();
       return NextResponse.json(data, { status: res.status });
     }
@@ -47,9 +58,12 @@ async function proxyVendorAuth(
     const text = await res.text();
     return new NextResponse(text, {
       status: res.status,
-      headers: { "Content-Type": contentType },
+      headers: { "Content-Type": resContentType },
     });
   } catch (error: any) {
+    if (error?.digest?.startsWith?.("NEXT_")) {
+      throw error;
+    }
     console.error("[Vendor Auth Proxy Error]:", error);
     return NextResponse.json(
       {
