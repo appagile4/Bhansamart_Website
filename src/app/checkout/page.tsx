@@ -196,7 +196,7 @@ function CheckoutContent() {
     const cleanAddress =
       currentAddress.addressLine && !currentAddress.addressLine.includes("GPS")
         ? currentAddress.addressLine
-        : "Dwarka Sector 5, New Delhi";
+        : "Plato 19, Dwarka Sector 5, New Delhi";
 
     if (!cleanAddress) {
       setErrorMessage("Please choose a valid delivery address.");
@@ -346,7 +346,7 @@ function CheckoutContent() {
                 <span className="font-semibold text-slate-800 truncate max-w-xs text-right">
                   {currentAddress.addressLine && !currentAddress.addressLine.includes("GPS")
                     ? currentAddress.addressLine
-                    : "Dwarka Sector 5, New Delhi"}
+                    : "Plato 19, Dwarka Sector 5, New Delhi"}
                 </span>
               </div>
 
@@ -522,7 +522,7 @@ function CheckoutContent() {
                     <p className="text-xs text-slate-700 mt-1 leading-relaxed font-medium">
                       {currentAddress.addressLine && !currentAddress.addressLine.includes("GPS")
                         ? currentAddress.addressLine
-                        : "Dwarka Sector 5, New Delhi"}
+                        : "Plato 19, Dwarka Sector 5, New Delhi"}
                     </p>
                     {currentAddress.city ? (
                       <p className="text-[11px] text-slate-500 mt-0.5">

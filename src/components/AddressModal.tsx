@@ -95,7 +95,7 @@ export default function AddressModal() {
             dispatch(
               setAddress({
                 name: "Current Location",
-                addressLine: "Dwarka Sector 5, New Delhi",
+                addressLine: "Plato 19, Dwarka Sector 5, New Delhi",
                 city: "New Delhi",
                 lat,
                 lng,
@@ -106,7 +106,7 @@ export default function AddressModal() {
           dispatch(
             setAddress({
               name: "Current Location",
-              addressLine: "Dwarka Sector 5, New Delhi",
+              addressLine: "Plato 19, Dwarka Sector 5, New Delhi",
               city: "New Delhi",
               lat,
               lng,
