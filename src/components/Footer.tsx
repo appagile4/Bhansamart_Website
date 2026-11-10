@@ -9,30 +9,12 @@ import {
 } from "@/lib/constants/categories";
 
 // ── Useful Links Data ──
-const USEFUL_LINKS_COL_1 = [
+const USEFUL_LINKS = [
   { label: "Privacy Policy", href: "/privacy-policy" },
   { label: "Terms & Conditions", href: "/terms-and-conditions" },
   { label: "FAQs", href: "/faqs" },
   { label: "Security", href: "/security" },
   { label: "Contact Us", href: "/contact-us" },
-];
-
-const USEFUL_LINKS_COL_2 = [
-  { label: "Partner With Us", href: "#" },
-  { label: "Franchise Inquiry", href: "#" },
-  { label: "Seller Hub", href: "#" },
-  { label: "Warehouse Locator", href: "#" },
-  { label: "Deliver With Us", href: "#" },
-  { label: "Resources", href: "#" },
-];
-
-const USEFUL_LINKS_COL_3 = [
-  { label: "Recipes & Meals", href: "#" },
-  { label: "Quick Bistro", href: "#" },
-  { label: "District Hubs", href: "#" },
-  { label: "BhansaMart Care", href: "#" },
-  { label: "Feeding Bharat", href: "#" },
-  { label: "BhansaMart Rewards", href: "#" },
 ];
 
 // ── Real Categories in 3 Columns from System Catalog ──
@@ -121,50 +103,26 @@ export default function Footer() {
         {/* ── Top Section: Useful Links & Real Categories ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 pb-10">
           
-          {/* ── Left Column: Useful Links (5 cols) ── */}
-          <div className="lg:col-span-4 xl:col-span-5">
+          {/* ── Left Column: Useful Links ── */}
+          <div className="lg:col-span-3 xl:col-span-3">
             <h3 className="text-base font-extrabold text-slate-900 mb-5 tracking-tight">
               Useful Links
             </h3>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-2.5 text-xs text-slate-600">
-              <div className="space-y-2.5">
-                {USEFUL_LINKS_COL_1.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="block hover:text-[#0C831F] transition-colors leading-snug cursor-pointer"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-              <div className="space-y-2.5">
-                {USEFUL_LINKS_COL_2.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="block hover:text-[#0C831F] transition-colors leading-snug cursor-pointer"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-              <div className="space-y-2.5">
-                {USEFUL_LINKS_COL_3.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="block hover:text-[#0C831F] transition-colors leading-snug cursor-pointer"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
+            <div className="space-y-2.5 text-xs text-slate-600">
+              {USEFUL_LINKS.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="block hover:text-[#0C831F] transition-colors leading-snug cursor-pointer font-medium"
+                >
+                  {item.label}
+                </Link>
+              ))}
             </div>
           </div>
 
-          {/* ── Right Column: Real Categories with Active Route (7 cols) ── */}
-          <div className="lg:col-span-8 xl:col-span-7">
+          {/* ── Right Column: Real Categories with Active Route ── */}
+          <div className="lg:col-span-9 xl:col-span-9">
             <div className="flex items-center gap-2.5 mb-5">
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
                 Categories
