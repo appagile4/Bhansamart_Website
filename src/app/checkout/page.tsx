@@ -86,6 +86,30 @@ const DEFAULT_METHODS: PaymentOption[] = [
   },
 ];
 
+const mapBackendPaymentEnum = (displayName: string, methodKey: string): string => {
+  const m = displayName.toLowerCase();
+  const k = methodKey.toLowerCase();
+  if (k === "cod" || m.includes("cash") || m.includes("delivery") || m.includes("cod")) {
+    return "Cash on delivery";
+  }
+  if (k === "esewa" || m.includes("esewa")) {
+    return "esewa";
+  }
+  if (k === "khalti" || m.includes("khalti")) {
+    return "khalti";
+  }
+  if (k === "card" || m.includes("card")) {
+    return "card";
+  }
+  if (k === "upi" || m.includes("upi") || m.includes("qr")) {
+    return "Vendor QR Code (Direct)";
+  }
+  if (k === "bank_transfer" || k === "wallet" || m.includes("bank") || m.includes("wallet") || m.includes("online")) {
+    return "Online Payment";
+  }
+  return "Cash on delivery";
+};
+
 function CheckoutContent() {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -119,10 +143,11 @@ function CheckoutContent() {
     }
   }, [user, phone]);
 
-  // Payment Methods
+  // Payment Methods State
   const [paymentMethods, setPaymentMethods] =
     useState<PaymentOption[]>(DEFAULT_METHODS);
-  const [selectedMethod, setSelectedMethod] = useState<string>("Cash on delivery");
+  const [selectedMethodKey, setSelectedMethodKey] = useState<string>("cod");
+  const [selectedMethodName, setSelectedMethodName] = useState<string>("Cash on delivery");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -151,6 +176,15 @@ function CheckoutContent() {
             data.data.paymentMethods.length > 0
           ) {
             setPaymentMethods(data.data.paymentMethods);
+            const activeMethods = data.data.paymentMethods.filter((m: PaymentOption) => m.isEnabled !== false);
+            const codMethod = activeMethods.find((m: PaymentOption) => m.methodKey === "cod");
+            if (codMethod) {
+              setSelectedMethodKey(codMethod.methodKey);
+              setSelectedMethodName(codMethod.displayName);
+            } else if (activeMethods[0]) {
+              setSelectedMethodKey(activeMethods[0].methodKey);
+              setSelectedMethodName(activeMethods[0].displayName);
+            }
           }
         }
       } catch (e) {
@@ -248,7 +282,8 @@ function CheckoutContent() {
             latitude: currentAddress.lat,
             longitude: currentAddress.lng,
           },
-          paymentMethod: selectedMethod,
+          paymentMethod: mapBackendPaymentEnum(selectedMethodName, selectedMethodKey),
+          paymentMethodKey: selectedMethodKey,
           idempotencyKey: orderId,
         }),
       });
@@ -337,7 +372,7 @@ function CheckoutContent() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">Payment Method</span>
                 <span className="font-semibold text-slate-800">
-                  {confirmedOrder.paymentMethod || selectedMethod}
+                  {confirmedOrder.paymentMethod || selectedMethodName}
                 </span>
               </div>
 
@@ -713,12 +748,17 @@ function CheckoutContent() {
               {/* Methods Radio Cards */}
               <div className="space-y-2.5">
                 {paymentMethods.map((method) => {
-                  const isSelected = selectedMethod === method.displayName;
+                  const isSelected =
+                    selectedMethodKey === method.methodKey ||
+                    selectedMethodName.toLowerCase() === method.displayName.toLowerCase();
 
                   return (
                     <label
                       key={method.methodKey}
-                      onClick={() => setSelectedMethod(method.displayName)}
+                      onClick={() => {
+                        setSelectedMethodKey(method.methodKey);
+                        setSelectedMethodName(method.displayName);
+                      }}
                       className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
                         isSelected
                           ? "bg-emerald-50/60 border-[#0C831F] ring-2 ring-emerald-300/60 shadow-xs"
@@ -850,7 +890,9 @@ function CheckoutContent() {
               >
                 <div className="flex flex-col text-left">
                   <span className="text-xs uppercase tracking-wider text-emerald-100 font-bold">
-                    {selectedMethod.includes("delivery") ? "PAY ON DELIVERY" : "PAY NOW"}
+                    {selectedMethodKey === "cod" || selectedMethodName.toLowerCase().includes("delivery")
+                      ? "PAY ON DELIVERY"
+                      : "PAY NOW"}
                   </span>
                   <span className="text-base font-black leading-none mt-0.5">
                     ₹{grandTotal}
