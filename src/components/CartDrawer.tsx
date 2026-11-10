@@ -38,9 +38,9 @@ export default function CartDrawer() {
   const handleCheckout = () => {
     dispatch(closeCart());
     if (!isAuthenticated) {
-      router.push("/login?redirect=checkout");
+      router.push("/login?redirect=/checkout");
     } else {
-      router.push("/profile");
+      router.push("/checkout");
     }
   };
 

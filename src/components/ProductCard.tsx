@@ -22,6 +22,7 @@ export interface ProductItem {
   ratingsAverage?: number;
   ratingsCount?: number;
   images?: Array<{ url: string; altText?: string; publicId?: string }>;
+  imageUrl?: string;
   vendor?: {
     _id?: string;
     businessDetails?: {
