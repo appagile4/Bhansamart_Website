@@ -3,6 +3,7 @@ import authReducer from "./slices/authSlice";
 import cartReducer from "./slices/cartSlice";
 import addressReducer from "./slices/addressSlice";
 import productsReducer from "./slices/productsSlice";
+import vendorReducer from "./slices/vendorSlice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     cart: cartReducer,
     address: addressReducer,
     products: productsReducer,
+    vendor: vendorReducer,
   },
   devTools: process.env.NODE_ENV !== "production",
 });

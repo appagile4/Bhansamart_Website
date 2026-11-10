@@ -80,3 +80,75 @@ export async function GET(
     source: "fallback",
   });
 }
+
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const backendUrl = getBackendApiUrl();
+
+    const authHeader = req.headers.get("authorization");
+    const headers: Record<string, string> = {};
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    }
+
+    const contentType = req.headers.get("content-type") || "";
+    let body: any;
+    if (contentType.includes("application/json")) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(await req.json());
+    } else if (contentType.includes("multipart/form-data")) {
+      body = await req.formData();
+    } else {
+      body = await req.text();
+    }
+
+    const res = await fetch(`${backendUrl}/products/${id}`, {
+      method: "PUT",
+      headers,
+      body,
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error?.message || "Failed to update product" },
+      { status: 502 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const backendUrl = getBackendApiUrl();
+
+    const authHeader = req.headers.get("authorization");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    }
+
+    const res = await fetch(`${backendUrl}/products/${id}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error?.message || "Failed to delete product" },
+      { status: 502 }
+    );
+  }
+}

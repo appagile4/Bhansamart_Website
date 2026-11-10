@@ -355,3 +355,40 @@ export async function GET(req: NextRequest) {
     products: filtered,
   });
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const backendUrl = getBackendApiUrl();
+    const authHeader = req.headers.get("authorization");
+    const headers: Record<string, string> = {};
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    }
+
+    const contentType = req.headers.get("content-type") || "";
+    let body: any;
+    if (contentType.includes("application/json")) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(await req.json());
+    } else if (contentType.includes("multipart/form-data")) {
+      body = await req.formData();
+    } else {
+      body = await req.text();
+    }
+
+    const res = await fetch(`${backendUrl}/products`, {
+      method: "POST",
+      headers,
+      body,
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: any) {
+    console.error("[Create Product Proxy Error]:", error);
+    return NextResponse.json(
+      { success: false, message: error?.message || "Failed to create product" },
+      { status: 502 }
+    );
+  }
+}
