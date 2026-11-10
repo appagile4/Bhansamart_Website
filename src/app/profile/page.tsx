@@ -23,9 +23,6 @@ import {
   ShoppingBag,
   BookOpen,
   Star,
-  Tag,
-  Ticket,
-  Users,
   CreditCard,
   Share2,
   HelpCircle,
@@ -1663,68 +1660,7 @@ function ProfileContent() {
             </div>
           </div>
 
-          {/* Group 2: PAYMENTS AND COUPONS */}
-          <div className="mb-6">
-            <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase block mb-2 px-3">
-              PAYMENTS AND COUPONS
-            </span>
-
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => router.push("/profile?tab=loyalty", { scroll: false })}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer text-left ${
-                  activeTab === "loyalty"
-                    ? "bg-[#EAF5E9] text-[#2E7D32] font-bold"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <Tag className="w-4 h-4" />
-                <span>Loyalty</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/profile?tab=coupons", { scroll: false })}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer text-left ${
-                  activeTab === "coupons"
-                    ? "bg-[#EAF5E9] text-[#2E7D32] font-bold"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <Ticket className="w-4 h-4" />
-                <span>Collected coupon</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/profile?tab=referral", { scroll: false })}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer text-left ${
-                  activeTab === "referral"
-                    ? "bg-[#EAF5E9] text-[#2E7D32] font-bold"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span>Refer and Earned</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/profile?tab=paymentSettings", { scroll: false })}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer text-left ${
-                  activeTab === "paymentSettings"
-                    ? "bg-[#EAF5E9] text-[#2E7D32] font-bold"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Payment Settings</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Group 3: OTHER INFORMATION */}
+          {/* Group 2: OTHER INFORMATION */}
           <div>
             <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase block mb-2 px-3">
               OTHER INFORMATION
@@ -2489,66 +2425,6 @@ function ProfileContent() {
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* FALLBACK TABS */}
-          {["loyalty", "coupons", "paymentSettings"].includes(activeTab) && (
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2 capitalize">
-                {activeTab}
-              </h2>
-              <p className="text-xs text-slate-500 mb-6">
-                Manage your {activeTab} information and preferences.
-              </p>
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-                <Check className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                <p className="text-xs font-medium text-slate-600">
-                  Feature active and synchronized with your BhansaMart account.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: REFER AND EARNED */}
-          {activeTab === "referral" && (
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
-                Refer and Earned
-              </h2>
-              <p className="text-xs text-slate-500 mb-6">
-                Share your referral link with friends and earn reward points on their first delivery
-              </p>
-
-              <div className="bg-[#EAF5E9] p-6 rounded-2xl border border-emerald-200 mb-6">
-                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block mb-1">
-                  Your Unique Referral Code
-                </span>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="font-mono text-xl font-black bg-white px-4 py-2 rounded-xl text-slate-900 border border-emerald-200">
-                    {user?.referralCode || "BHANSA2026"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => alert("Referral code copied to clipboard!")}
-                    className="px-4 py-2 bg-[#2E7D32] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
-                  >
-                    Copy Code
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200">
-                <Tag className="w-6 h-6 text-emerald-700" />
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    Current Balance: {user?.rewardPoints || 0} Points
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    1 Point = ₹1. Automatically applicable during checkout.
-                  </p>
-                </div>
-              </div>
             </div>
           )}
         </section>
