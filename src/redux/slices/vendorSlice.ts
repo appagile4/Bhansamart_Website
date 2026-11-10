@@ -238,40 +238,11 @@ interface VendorState {
   deliveryRadiusKm: number;
 }
 
-const getStoredVendorToken = (): string | null => {
-  if (typeof window === "undefined") return null;
-  return (
-    localStorage.getItem("bhansa_vendor_token") ||
-    localStorage.getItem("vendor_token") ||
-    null
-  );
-};
-
-const getStoredVendorUser = (): VendorUser | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("bhansa_vendor_user");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const getStoredVendorProfile = (): VendorProfile | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("bhansa_vendor_profile");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
 const initialState: VendorState = {
-  vendorToken: getStoredVendorToken(),
-  vendorUser: getStoredVendorUser(),
-  vendorProfile: getStoredVendorProfile(),
-  isAuthenticated: !!getStoredVendorToken(),
+  vendorToken: null,
+  vendorUser: null,
+  vendorProfile: null,
+  isAuthenticated: false,
   isLoading: false,
   error: null,
   successMessage: null,
@@ -300,6 +271,15 @@ const initialState: VendorState = {
 
   isStoreOpen: true,
   deliveryRadiusKm: 10,
+};
+
+const getStoredVendorToken = (): string | null => {
+  if (typeof window === "undefined") return null;
+  return (
+    localStorage.getItem("bhansa_vendor_token") ||
+    localStorage.getItem("vendor_token") ||
+    null
+  );
 };
 
 // Helper for vendor authenticated headers
@@ -736,6 +716,37 @@ export const vendorSlice = createSlice({
   name: "vendor",
   initialState,
   reducers: {
+    initializeVendor: (state) => {
+      if (typeof window !== "undefined") {
+        const token =
+          localStorage.getItem("bhansa_vendor_token") ||
+          localStorage.getItem("vendor_token");
+        const userStr = localStorage.getItem("bhansa_vendor_user");
+        const profileStr = localStorage.getItem("bhansa_vendor_profile");
+
+        if (token) {
+          state.vendorToken = token;
+          state.isAuthenticated = true;
+          if (userStr) {
+            try {
+              state.vendorUser = JSON.parse(userStr);
+            } catch {
+              localStorage.removeItem("bhansa_vendor_user");
+            }
+          }
+          if (profileStr) {
+            try {
+              const p = JSON.parse(profileStr);
+              state.vendorProfile = p;
+              state.isStoreOpen = p.isStoreOpen ?? true;
+              state.deliveryRadiusKm = p.deliveryRadiusKm ?? 10;
+            } catch {
+              localStorage.removeItem("bhansa_vendor_profile");
+            }
+          }
+        }
+      }
+    },
     logoutVendor: (state) => {
       state.vendorToken = null;
       state.vendorUser = null;
@@ -929,7 +940,12 @@ export const vendorSlice = createSlice({
   },
 });
 
-export const { logoutVendor, clearVendorAlerts, setLocalStoreStatus, setLocalDeliveryRadius } =
-  vendorSlice.actions;
+export const {
+  initializeVendor,
+  logoutVendor,
+  clearVendorAlerts,
+  setLocalStoreStatus,
+  setLocalDeliveryRadius,
+} = vendorSlice.actions;
 
 export default vendorSlice.reducer;

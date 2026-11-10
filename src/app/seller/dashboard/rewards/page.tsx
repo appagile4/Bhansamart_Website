@@ -16,7 +16,9 @@ import { useAppSelector } from "@/redux/hooks";
 import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorRewardsPage() {
-  const { vendorUser, vendorProfile } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorUser = vendorState?.vendorUser ?? null;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
   const [copied, setCopied] = useState(false);
 
   const referralCode =

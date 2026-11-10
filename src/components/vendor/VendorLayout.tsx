@@ -14,9 +14,8 @@ import VendorHeader from "./VendorHeader";
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { vendorToken, isAuthenticated, vendorUser } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorToken = vendorState?.vendorToken;
 
   const [collapsed, setCollapsed] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);

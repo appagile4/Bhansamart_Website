@@ -37,7 +37,9 @@ function VendorOrdersContent() {
   const verifyOrderId = searchParams.get("verify");
 
   const dispatch = useAppDispatch();
-  const { orders, ordersLoading } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const orders = vendorState?.orders ?? [];
+  const ordersLoading = vendorState?.ordersLoading ?? false;
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchQuery, setSearchQuery] = useState("");

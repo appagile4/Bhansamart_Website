@@ -18,7 +18,9 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorCustomersPage() {
   const dispatch = useAppDispatch();
-  const { customers, customersLoading } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const customers = vendorState?.customers ?? [];
+  const customersLoading = vendorState?.customersLoading ?? false;
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {

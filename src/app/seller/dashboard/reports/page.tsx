@@ -17,9 +17,10 @@ import { useAppSelector } from "@/redux/hooks";
 import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorReportsPage() {
-  const { stats, vendorProfile, vendorUser } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const stats = vendorState?.stats ?? null;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
+  const vendorUser = vendorState?.vendorUser ?? null;
   const [reportType, setReportType] = useState<"sales" | "orders" | "tax">("sales");
   const [dateRange, setDateRange] = useState("This Month");
   const [generatedDate, setGeneratedDate] = useState("Today");

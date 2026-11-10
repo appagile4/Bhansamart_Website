@@ -120,7 +120,9 @@ function VendorInventoryContent() {
   const initialTab = searchParams.get("tab") || "overview";
 
   const dispatch = useAppDispatch();
-  const { products, productsLoading } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const products = vendorState?.products ?? [];
+  const productsLoading = vendorState?.productsLoading ?? false;
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchQuery, setSearchQuery] = useState("");

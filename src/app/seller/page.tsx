@@ -26,9 +26,11 @@ import {
 export default function SellerLoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated, vendorToken } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const isLoading = vendorState?.isLoading ?? false;
+  const error = vendorState?.error ?? null;
+  const isAuthenticated = vendorState?.isAuthenticated ?? false;
+  const vendorToken = vendorState?.vendorToken ?? null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

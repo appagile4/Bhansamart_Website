@@ -22,9 +22,10 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorDeliveryPage() {
   const dispatch = useAppDispatch();
-  const { isStoreOpen, deliveryRadiusKm, vendorProfile } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const isStoreOpen = vendorState?.isStoreOpen ?? true;
+  const deliveryRadiusKm = vendorState?.deliveryRadiusKm ?? 10;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
 
   const [radius, setRadius] = useState(deliveryRadiusKm || 10);
   const [saving, setSaving] = useState(false);

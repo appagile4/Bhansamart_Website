@@ -20,9 +20,9 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorNotificationsPage() {
   const dispatch = useAppDispatch();
-  const { notifications, unreadNotificationsCount } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const notifications = vendorState?.notifications ?? [];
+  const unreadNotificationsCount = vendorState?.unreadNotificationsCount ?? 0;
 
   useEffect(() => {
     dispatch(fetchVendorNotifications());

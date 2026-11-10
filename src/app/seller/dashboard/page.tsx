@@ -30,16 +30,15 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorDashboardOverview() {
   const dispatch = useAppDispatch();
-  const {
-    stats,
-    statsLoading,
-    orders,
-    ordersLoading,
-    products,
-    vendorUser,
-    vendorProfile,
-    isStoreOpen,
-  } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const stats = vendorState?.stats ?? null;
+  const statsLoading = vendorState?.statsLoading ?? false;
+  const orders = vendorState?.orders ?? [];
+  const ordersLoading = vendorState?.ordersLoading ?? false;
+  const products = vendorState?.products ?? [];
+  const vendorUser = vendorState?.vendorUser ?? null;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
+  const isStoreOpen = vendorState?.isStoreOpen ?? true;
 
   const [filterPeriod, setFilterPeriod] = useState<"today" | "week" | "month">("today");
 

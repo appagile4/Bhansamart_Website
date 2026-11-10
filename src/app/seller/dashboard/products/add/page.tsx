@@ -22,7 +22,8 @@ function AddProductContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const dispatch = useAppDispatch();
-  const { vendorToken } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorToken = vendorState?.vendorToken ?? null;
 
   // Form Fields
   const [name, setName] = useState("");

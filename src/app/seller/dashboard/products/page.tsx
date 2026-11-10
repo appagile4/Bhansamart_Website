@@ -31,9 +31,10 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorProductsPage() {
   const dispatch = useAppDispatch();
-  const { products, productsTotal, productsLoading } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const products = vendorState?.products ?? [];
+  const productsTotal = vendorState?.productsTotal ?? 0;
+  const productsLoading = vendorState?.productsLoading ?? false;
 
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchQuery, setSearchQuery] = useState("");

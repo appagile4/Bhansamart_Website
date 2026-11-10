@@ -23,9 +23,10 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorSettingsPage() {
   const dispatch = useAppDispatch();
-  const { vendorProfile, vendorUser, deliveryRadiusKm } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorProfile = vendorState?.vendorProfile ?? null;
+  const vendorUser = vendorState?.vendorUser ?? null;
+  const deliveryRadiusKm = vendorState?.deliveryRadiusKm ?? 10;
 
   const [businessName, setBusinessName] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");

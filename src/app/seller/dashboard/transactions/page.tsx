@@ -31,12 +31,11 @@ import VendorLayout from "@/components/vendor/VendorLayout";
 
 export default function VendorTransactionsPage() {
   const dispatch = useAppDispatch();
-  const {
-    stats,
-    transactions,
-    txnsLoading,
-    codDueRiders,
-  } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const stats = vendorState?.stats ?? null;
+  const transactions = vendorState?.transactions ?? [];
+  const txnsLoading = vendorState?.txnsLoading ?? false;
+  const codDueRiders = vendorState?.codDueRiders ?? [];
 
   const [activeTab, setActiveTab] = useState<"history" | "cod">("history");
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);

@@ -50,9 +50,10 @@ export default function VendorSidebar({
 }) {
   const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const { isStoreOpen, vendorProfile, vendorUser } = useAppSelector(
-    (state) => state.vendor
-  );
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const isStoreOpen = vendorState?.isStoreOpen ?? true;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
+  const vendorUser = vendorState?.vendorUser ?? null;
 
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({
     orders: pathname.includes("/orders"),

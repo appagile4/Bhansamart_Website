@@ -33,14 +33,13 @@ export default function VendorHeader({
 }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const {
-    vendorUser,
-    vendorProfile,
-    notifications,
-    unreadNotificationsCount,
-    isStoreOpen,
-    deliveryRadiusKm,
-  } = useAppSelector((state) => state.vendor);
+  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorUser = vendorState?.vendorUser ?? null;
+  const vendorProfile = vendorState?.vendorProfile ?? null;
+  const notifications = vendorState?.notifications ?? [];
+  const unreadNotificationsCount = vendorState?.unreadNotificationsCount ?? 0;
+  const isStoreOpen = vendorState?.isStoreOpen ?? true;
+  const deliveryRadiusKm = vendorState?.deliveryRadiusKm ?? 10;
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
