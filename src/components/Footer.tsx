@@ -3,88 +3,123 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  ALL_CATEGORY_SECTIONS,
+  ALL_CATEGORY_ITEMS,
+} from "@/lib/constants/categories";
 
 // ── Useful Links Data ──
 const USEFUL_LINKS_COL_1 = [
   { label: "Blog", href: "#" },
-  { label: "Privacy", href: "#" },
-  { label: "Terms", href: "#" },
+  { label: "Privacy Policy", href: "#" },
+  { label: "Terms & Conditions", href: "#" },
   { label: "FAQs", href: "#" },
   { label: "Security", href: "#" },
-  { label: "Contact", href: "#" },
+  { label: "Contact Us", href: "#" },
 ];
 
 const USEFUL_LINKS_COL_2 = [
-  { label: "Partner", href: "#" },
-  { label: "Franchise", href: "#" },
-  { label: "Seller", href: "#" },
-  { label: "Warehouse", href: "#" },
-  { label: "Deliver", href: "#" },
+  { label: "Partner With Us", href: "#" },
+  { label: "Franchise Inquiry", href: "#" },
+  { label: "Seller Hub", href: "#" },
+  { label: "Warehouse Locator", href: "#" },
+  { label: "Deliver With Us", href: "#" },
   { label: "Resources", href: "#" },
 ];
 
 const USEFUL_LINKS_COL_3 = [
-  { label: "Recipes", href: "#" },
-  { label: "Bistro", href: "#" },
-  { label: "District", href: "#" },
-  { label: "Blinkit Ambulance", href: "#" },
-  { label: "Feeding India", href: "#" },
-  { label: "Eternal SBI Credit Card", href: "#" },
+  { label: "Recipes & Meals", href: "#" },
+  { label: "Quick Bistro", href: "#" },
+  { label: "District Hubs", href: "#" },
+  { label: "BhansaMart Care", href: "#" },
+  { label: "Feeding Bharat", href: "#" },
+  { label: "BhansaMart Rewards", href: "#" },
 ];
 
-// ── Categories Data (Matching Blinkit layout) ──
-const CATEGORIES_COL_1 = [
-  "Bath & Body",
-  "Beauty & Cosmetics",
-  "Health & Pharma",
-  "Atta, Rice & Dal",
-  "Bakery & Biscuits",
-  "Kitchenware & Appliances",
-  "Drinks & Juices",
-  "Sauces & Spreads",
-  "Home & Lifestyle",
-  "Stationery & Games",
-  "Rakhi Gifts",
-];
-
-const CATEGORIES_COL_2 = [
-  "Hair",
-  "Feminine Hygiene",
-  "Sexual Wellness",
-  "Oil, Ghee & Masala",
-  "Dry Fruits & Cereals",
-  "Chips & Namkeen",
-  "Tea, Coffee & Milk Drinks",
-  "Paan Corner",
-  "Cleaners & Repellents",
-  "Print Store",
-];
-
-const CATEGORIES_COL_3 = [
-  "Skin & Face",
-  "Baby Care",
+// ── Real Categories in 3 Columns from System Catalog ──
+const REAL_CATEGORIES_COL_1 = [
   "Vegetables & Fruits",
+  "Atta, Rice & Dal",
+  "Oil, Ghee & Masala",
   "Dairy, Bread & Eggs",
+  "Bakery & Biscuits",
+  "Dry Fruits & Cereals",
   "Chicken, Meat & Fish",
-  "Sweets & Chocolates",
-  "Instant Food",
-  "Ice Creams & More",
-  "Electronics",
-  "E-Gift Cards",
+  "Kitchenware & Appliances",
+  "Chips, Nachos & Popcorn",
+  "Namkeen & Roasted",
+  "Cold Drinks & Ice Cream",
+];
+
+const REAL_CATEGORIES_COL_2 = [
+  "Biscuits & Cookies",
+  "Chocolates & Candies",
+  "Dry Fruits & Nuts",
+  "Snack Bars & Healthy Bites",
+  "Instant Noodles & Pasta",
+  "Bath & Body",
+  "Hair Care",
+  "Skin & Faces",
+  "Beauty & Cosmetics",
+  "Feminine Hygiene",
+  "Fragrances & Deodorants",
+];
+
+const REAL_CATEGORIES_COL_3 = [
+  "Health & Pharma",
+  "Sexual Wellness",
+  "Baby Food",
+  "Diapers & Pants",
+  "Baby Care",
+  "Cleaners & Repellents",
+  "Laundry & Detergents",
+  "Home & Lifestyle",
+  "Air Fresheners",
+  "Pooch & Pet Care",
+  "Electronics & Gadgets",
 ];
 
 export default function Footer() {
   const router = useRouter();
 
   const handleCategoryClick = (categoryName: string) => {
-    router.push(`/categoryExpand?category=${encodeURIComponent(categoryName)}`);
+    // 1. Check if category matches a subcategory item
+    const matchedItem = ALL_CATEGORY_ITEMS.find(
+      (it) => it.name.replace("\n", " ").toLowerCase() === categoryName.toLowerCase()
+    );
+
+    if (matchedItem) {
+      const section = matchedItem.categoryTitle || "Grocery & Kitchen";
+      const subName = matchedItem.name.replace("\n", " ");
+      router.push(
+        `/categoryExpand?category=${encodeURIComponent(section)}&subCategory=${encodeURIComponent(subName)}`
+      );
+    } else {
+      // 2. Check if category matches a main section title
+      const matchedSection = ALL_CATEGORY_SECTIONS.find(
+        (s) => s.title.toLowerCase() === categoryName.toLowerCase()
+      );
+      if (matchedSection) {
+        const firstSub = matchedSection.items[0]?.name.replace("\n", " ") || "All";
+        router.push(
+          `/categoryExpand?category=${encodeURIComponent(matchedSection.title)}&subCategory=${encodeURIComponent(firstSub)}`
+        );
+      } else {
+        router.push(`/categoryExpand?category=${encodeURIComponent(categoryName)}`);
+      }
+    }
+
+    // Scroll smoothly to top of products catalog
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   return (
     <footer className="w-full bg-white border-t border-slate-200/80 text-slate-700 mt-auto select-none">
       <div className="w-[90%] lg:w-[85%] max-w-7xl mx-auto pt-12 pb-8">
         
-        {/* ── Top Section: Useful Links & Categories ── */}
+        {/* ── Top Section: Useful Links & Real Categories ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 pb-10">
           
           {/* ── Left Column: Useful Links (5 cols) ── */}
@@ -129,7 +164,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ── Right Column: Categories (7 cols) ── */}
+          {/* ── Right Column: Real Categories with Active Route (7 cols) ── */}
           <div className="lg:col-span-8 xl:col-span-7">
             <div className="flex items-center gap-2.5 mb-5">
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
@@ -137,6 +172,11 @@ export default function Footer() {
               </h3>
               <Link
                 href="/categoryExpand"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
                 className="text-xs font-bold text-[#0C831F] hover:underline cursor-pointer"
               >
                 see all
@@ -146,12 +186,13 @@ export default function Footer() {
             <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs text-slate-600">
               {/* Category Col 1 */}
               <div className="space-y-2.5">
-                {CATEGORIES_COL_1.map((cat) => (
+                {REAL_CATEGORIES_COL_1.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => handleCategoryClick(cat)}
                     className="block text-left text-xs text-slate-600 hover:text-[#0C831F] transition-colors leading-snug cursor-pointer truncate w-full"
+                    title={`Browse ${cat}`}
                   >
                     {cat}
                   </button>
@@ -160,12 +201,13 @@ export default function Footer() {
 
               {/* Category Col 2 */}
               <div className="space-y-2.5">
-                {CATEGORIES_COL_2.map((cat) => (
+                {REAL_CATEGORIES_COL_2.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => handleCategoryClick(cat)}
                     className="block text-left text-xs text-slate-600 hover:text-[#0C831F] transition-colors leading-snug cursor-pointer truncate w-full"
+                    title={`Browse ${cat}`}
                   >
                     {cat}
                   </button>
@@ -174,12 +216,13 @@ export default function Footer() {
 
               {/* Category Col 3 */}
               <div className="space-y-2.5">
-                {CATEGORIES_COL_3.map((cat) => (
+                {REAL_CATEGORIES_COL_3.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => handleCategoryClick(cat)}
                     className="block text-left text-xs text-slate-600 hover:text-[#0C831F] transition-colors leading-snug cursor-pointer truncate w-full"
+                    title={`Browse ${cat}`}
                   >
                     {cat}
                   </button>
@@ -233,7 +276,7 @@ export default function Footer() {
             </a>
           </div>
 
-          {/* Social Icons (Black circular pills matching screenshot) */}
+          {/* Social Icons (Black circular pills) */}
           <div className="flex items-center gap-2.5">
             {/* Facebook */}
             <a
@@ -302,7 +345,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* ── Disclaimer Line (Matching screenshot text) ── */}
+        {/* ── Disclaimer Line ── */}
         <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
           &quot;Blinkit&quot; is owned &amp; managed by &quot;Blink Commerce Private Limited&quot; and is not related, linked or interconnected in whatsoever manner or nature, to &quot;GROFFR.COM&quot; which is a real estate services business operated by &quot;Redstone Consultancy Services Private Limited&quot;.
         </p>

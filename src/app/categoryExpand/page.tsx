@@ -40,10 +40,21 @@ function CategoryExpandContent() {
   // 1. Resolve Active Category Section
   const activeSection: SectionCategoryData = useMemo(() => {
     if (queryCategory) {
+      // 1a. Direct section title match
       const found = ALL_CATEGORY_SECTIONS.find(
         (s) => s.title.toLowerCase() === queryCategory.toLowerCase()
       );
       if (found) return found;
+
+      // 1b. Check if queryCategory matches a subcategory item name
+      const foundByItem = ALL_CATEGORY_SECTIONS.find((s) =>
+        s.items.some(
+          (i) =>
+            i.name.replace("\n", " ").toLowerCase() ===
+            queryCategory.toLowerCase()
+        )
+      );
+      if (foundByItem) return foundByItem;
     }
     if (querySubCategory) {
       const foundBySub = ALL_CATEGORY_SECTIONS.find((s) =>
@@ -68,6 +79,14 @@ function CategoryExpandContent() {
       );
       if (match) return match.name.replace("\n", " ");
     }
+    if (queryCategory) {
+      const matchCat = activeSection.items.find(
+        (i) =>
+          i.name.replace("\n", " ").toLowerCase() ===
+          queryCategory.toLowerCase()
+      );
+      if (matchCat) return matchCat.name.replace("\n", " ");
+    }
     return activeSection.items[0]?.name.replace("\n", " ") || "All";
   });
 
@@ -75,10 +94,21 @@ function CategoryExpandContent() {
   useEffect(() => {
     if (querySubCategory) {
       setSelectedSubCategory(querySubCategory);
+    } else if (queryCategory) {
+      const matchCat = activeSection.items.find(
+        (i) =>
+          i.name.replace("\n", " ").toLowerCase() ===
+          queryCategory.toLowerCase()
+      );
+      if (matchCat) {
+        setSelectedSubCategory(matchCat.name.replace("\n", " "));
+      } else if (activeSection.items[0]) {
+        setSelectedSubCategory(activeSection.items[0].name.replace("\n", " "));
+      }
     } else if (activeSection.items[0]) {
       setSelectedSubCategory(activeSection.items[0].name.replace("\n", " "));
     }
-  }, [querySubCategory, activeSection]);
+  }, [queryCategory, querySubCategory, activeSection]);
 
   // 3. Products state
   const [products, setProducts] = useState<ProductItem[]>([]);
