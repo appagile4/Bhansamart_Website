@@ -67,12 +67,7 @@ export default function NearbyProducts() {
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
               {selectedCategory === "all"
                 ? "Products Near You"
-                : `${selectedCategory}`}
-              {selectedSubCategory !== "all" ? (
-                <span className="text-emerald-700 font-semibold text-sm ml-2">
-                  • {selectedSubCategory}
-                </span>
-              ) : null}
+                : selectedCategory}
             </h2>
             <span className="bg-emerald-100 text-[#0C831F] text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <Zap className="w-3 h-3 fill-[#0C831F]" />

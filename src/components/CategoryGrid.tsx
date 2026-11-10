@@ -3,20 +3,15 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { ALL_CATEGORY_ITEMS, CategoryCardData } from "@/lib/constants/categories";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { setSelectedCategory, setSelectedSubCategory } from "@/redux/slices/productsSlice";
 import { Sparkles } from "lucide-react";
 
 export default function CategoryGrid() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { selectedCategory, selectedSubCategory } = useAppSelector((state) => state.products);
 
   const handleCategoryClick = (item: CategoryCardData) => {
     const cat = item.categoryTitle || "Grocery & Kitchen";
     const sub = item.name.replace("\n", " ");
-    dispatch(setSelectedCategory(cat));
-    dispatch(setSelectedSubCategory(sub));
+    // Route to categoryExpand independently without mutating NearbyProducts state
     router.push(
       `/categoryExpand?category=${encodeURIComponent(cat)}&subCategory=${encodeURIComponent(sub)}`
     );
@@ -40,70 +35,34 @@ export default function CategoryGrid() {
             Select any category to browse verified products from your nearest hub
           </p>
         </div>
-
-        {/* Selected Category Clear Badge */}
-        {selectedCategory !== "all" || selectedSubCategory !== "all" ? (
-          <button
-            type="button"
-            onClick={() => {
-              dispatch(setSelectedCategory("all"));
-              dispatch(setSelectedSubCategory("all"));
-            }}
-            className="self-start sm:self-auto text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 cursor-pointer transition shadow-2xs"
-          >
-            <span>
-              Showing: {selectedSubCategory !== "all" ? selectedSubCategory : selectedCategory}
-            </span>
-            <span className="text-slate-400 font-normal ml-1">(Clear)</span>
-          </button>
-        ) : null}
       </div>
 
-      {/* ── Single Unified Category Grid (All In One) ── */}
+      {/* ── Single Unified Category Grid (Independent Navigation) ── */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
-          {ALL_CATEGORY_ITEMS.map((item) => {
-            const isSelected =
-              selectedSubCategory.toLowerCase() === item.name.replace("\n", " ").toLowerCase() ||
-              (selectedCategory.toLowerCase() === (item.categoryTitle || "").toLowerCase() &&
-                selectedSubCategory === "all");
+          {ALL_CATEGORY_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleCategoryClick(item)}
+              className="group w-full flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
+            >
+              {/* Image Card Box - Uniform 1:1 Aspect Square */}
+              <div className="w-full aspect-square rounded-2xl overflow-hidden relative flex items-center justify-center transition-all duration-200 border border-slate-100 group-hover:border-slate-300 shadow-2xs bg-[#EBF5FA]">
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  loading="lazy"
+                />
+              </div>
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleCategoryClick(item)}
-                className="group w-full flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
-              >
-                {/* Image Card Box - Exactly same 1:1 square size for all */}
-                <div
-                  className={`w-full aspect-square rounded-2xl overflow-hidden relative flex items-center justify-center transition-all duration-200 border shadow-2xs bg-[#EBF5FA] ${
-                    isSelected
-                      ? "border-[#0C831F] ring-2 ring-emerald-400 shadow-md"
-                      : "border-slate-100 hover:border-slate-300"
-                  }`}
-                >
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* Category Label - Fixed uniform height for all */}
-                <span
-                  className={`text-[11px] sm:text-xs leading-tight line-clamp-2 mt-2 font-medium h-7 sm:h-8 flex items-center justify-center text-center w-full px-0.5 ${
-                    isSelected
-                      ? "text-[#0C831F] font-bold"
-                      : "text-slate-700 group-hover:text-emerald-800"
-                  }`}
-                >
-                  {item.name.replace("\n", " ")}
-                </span>
-              </button>
-            );
-          })}
+              {/* Category Label */}
+              <span className="text-[11px] sm:text-xs leading-tight line-clamp-2 mt-2 font-medium h-7 sm:h-8 flex items-center justify-center text-center w-full px-0.5 text-slate-700 group-hover:text-emerald-800">
+                {item.name.replace("\n", " ")}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </section>
