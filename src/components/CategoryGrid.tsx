@@ -73,27 +73,27 @@ export default function CategoryGrid() {
                 key={item.id}
                 type="button"
                 onClick={() => handleCategoryClick(item)}
-                className="group flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
+                className="group w-full flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
               >
-                {/* Image Card Box */}
+                {/* Image Card Box - Exactly same 1:1 square size for all */}
                 <div
-                  className={`w-full aspect-square rounded-2xl flex items-center justify-center p-2.5 sm:p-3 transition-all duration-200 border shadow-2xs ${
+                  className={`w-full aspect-square rounded-2xl overflow-hidden relative flex items-center justify-center transition-all duration-200 border shadow-2xs bg-[#EBF5FA] ${
                     isSelected
-                      ? "bg-emerald-50 border-[#0C831F] ring-2 ring-emerald-300"
-                      : "bg-[#EBF5FA] hover:bg-[#E1EFF7] border-transparent group-hover:border-blue-100"
+                      ? "border-[#0C831F] ring-2 ring-emerald-400 shadow-md"
+                      : "border-slate-100 hover:border-slate-300"
                   }`}
                 >
                   <img
                     src={item.imageUrl}
                     alt={item.name}
-                    className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-108"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     loading="lazy"
                   />
                 </div>
 
-                {/* Category Label */}
+                {/* Category Label - Fixed uniform height for all */}
                 <span
-                  className={`text-[11px] sm:text-xs leading-tight line-clamp-2 mt-2 font-medium ${
+                  className={`text-[11px] sm:text-xs leading-tight line-clamp-2 mt-2 font-medium h-7 sm:h-8 flex items-center justify-center text-center w-full px-0.5 ${
                     isSelected
                       ? "text-[#0C831F] font-bold"
                       : "text-slate-700 group-hover:text-emerald-800"
