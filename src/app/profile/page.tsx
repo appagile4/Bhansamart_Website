@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import CartDrawer from "@/components/CartDrawer";
 import AddressModal from "@/components/AddressModal";
+import Footer from "@/components/Footer";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   logout,
@@ -54,6 +55,8 @@ import {
   ChevronUp,
   Truck,
   Clock,
+  XCircle,
+  Ban,
 } from "lucide-react";
 
 interface SavedAddress {
@@ -1169,12 +1172,83 @@ function ProfileContent() {
   ]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [expandedOrderIds, setExpandedOrderIds] = useState<Record<string, boolean>>({});
+  const [cancelModalOrder, setCancelModalOrder] = useState<UserOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>("Ordered by mistake / Duplicate order");
+  const [customCancelReason, setCustomCancelReason] = useState<string>("");
+  const [cancelLoading, setCancelLoading] = useState<boolean>(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null);
 
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrderIds((prev) => ({
       ...prev,
       [orderId]: !prev[orderId],
     }));
+  };
+
+  const handleOpenCancelModal = (order: UserOrder) => {
+    setCancelModalOrder(order);
+    setCancelReason("Ordered by mistake / Duplicate order");
+    setCustomCancelReason("");
+    setCancelError(null);
+  };
+
+  const handleConfirmCancelOrder = async () => {
+    if (!cancelModalOrder) return;
+    setCancelLoading(true);
+    setCancelError(null);
+
+    const finalReason =
+      cancelReason === "Other reason" && customCancelReason.trim()
+        ? customCancelReason.trim()
+        : cancelReason;
+
+    try {
+      const activeToken = token || localStorage.getItem("token");
+      const res = await fetch(`/api/orders/${cancelModalOrder._id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${activeToken}`,
+        },
+        body: JSON.stringify({ reason: finalReason }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to cancel order.");
+      }
+
+      // Update orders in state
+      setOrders((prev) =>
+        prev.map((ord) =>
+          ord._id === cancelModalOrder._id
+            ? {
+                ...ord,
+                orderStatus: "CANCELLED",
+                statusHistory: data.data?.statusHistory || [
+                  ...(ord.statusHistory || []),
+                  {
+                    status: "CANCELLED",
+                    timestamp: new Date().toISOString(),
+                    reason: finalReason,
+                  },
+                ],
+              }
+            : ord
+        )
+      );
+
+      setCancelSuccessMsg(
+        `Order #${cancelModalOrder.orderNumber || cancelModalOrder._id.slice(-8).toUpperCase()} was cancelled successfully.`
+      );
+      setCancelModalOrder(null);
+      setTimeout(() => setCancelSuccessMsg(null), 5000);
+    } catch (err: any) {
+      setCancelError(err?.message || "Failed to cancel order. Please try again.");
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   // ── 2. My Address Book State ──
@@ -1755,6 +1829,20 @@ function ProfileContent() {
                 )}
               </div>
 
+              {/* Cancel Success Alert */}
+              {cancelSuccessMsg && (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-2xs">
+                  <span>{cancelSuccessMsg}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCancelSuccessMsg(null)}
+                    className="text-emerald-700 hover:text-emerald-900 font-bold ml-2 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               {orders.length === 0 ? (
                 <div className="p-12 text-center bg-slate-50 rounded-3xl border border-slate-200/80">
                   <ShoppingBag className="w-12 h-12 text-slate-400 mx-auto mb-3" />
@@ -1777,6 +1865,9 @@ function ProfileContent() {
                     const isCancelled = ord.orderStatus?.toLowerCase().includes("cancel");
                     const isExpanded = !!expandedOrderIds[ord._id];
                     const activeStep = getActiveOrderStep(ord.orderStatus);
+                    const isCancellable = !["DELIVERED", "OUT_FOR_DELIVERY", "CANCELLED", "REJECTED"].includes(
+                      (ord.orderStatus || "").toUpperCase()
+                    );
 
                     return (
                       <div
@@ -1871,6 +1962,19 @@ function ProfileContent() {
                           </div>
 
                           <div className="flex items-center gap-2">
+                            {/* ── Cancel Order Button (Available before dispatch / delivery) ── */}
+                            {isCancellable && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCancelModal(ord)}
+                                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Cancel this order"
+                              >
+                                <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Cancel Order</span>
+                              </button>
+                            )}
+
                             {/* ── Tracking Dropdown Toggle Button ── */}
                             <button
                               type="button"
@@ -1904,6 +2008,23 @@ function ProfileContent() {
                         {/* ── Expandable Tracking Details Dropdown ── */}
                         {isExpanded && (
                           <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            
+                            {/* Cancellation Banner inside tracking if eligible */}
+                            {isCancellable && (
+                              <div className="bg-amber-50/90 rounded-2xl p-3.5 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-2 text-amber-800">
+                                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                  <span>Need to change plans? You can cancel your order before it leaves the store.</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCancelModal(ord)}
+                                  className="self-start sm:self-auto px-3 py-1 bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition cursor-pointer shadow-2xs"
+                                >
+                                  Cancel Order
+                                </button>
+                              </div>
+                            )}
                             
                             {/* 1. Live Tracking Stepper Header */}
                             <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/70">
@@ -2537,6 +2658,126 @@ function ProfileContent() {
           </div>
         </div>
       )}
+
+      {/* ── Cancel Order Confirmation Modal ── */}
+      {cancelModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2 text-rose-600 font-bold">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+                <h3 className="text-base text-slate-900">Cancel Order</h3>
+              </div>
+              <button
+                type="button"
+                disabled={cancelLoading}
+                onClick={() => setCancelModalOrder(null)}
+                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Are you sure you want to cancel order{" "}
+                  <strong className="text-slate-900">
+                    {cancelModalOrder.orderNumber || `#${cancelModalOrder._id.slice(-8).toUpperCase()}`}
+                  </strong>
+                  ? Once cancelled, active packing and delivery dispatch will be halted immediately.
+                </p>
+              </div>
+
+              {cancelError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Please select a reason for cancellation:
+                </label>
+                <div className="space-y-2">
+                  {[
+                    "Ordered by mistake / Duplicate order",
+                    "Delivery is taking longer than expected",
+                    "Need to modify items or order details",
+                    "Incorrect delivery address or phone number",
+                    "Found better price or alternative elsewhere",
+                    "Other reason",
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition ${
+                        cancelReason === reason
+                          ? "bg-emerald-50/70 border-[#0C831F] text-slate-900 font-medium"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancelReason"
+                        value={reason}
+                        checked={cancelReason === reason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        className="accent-[#0C831F]"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {cancelReason === "Other reason" && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={customCancelReason}
+                      onChange={(e) => setCustomCancelReason(e.target.value)}
+                      placeholder="Please describe your reason..."
+                      className="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#0C831F]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={cancelLoading}
+                  onClick={() => setCancelModalOrder(null)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  disabled={cancelLoading}
+                  onClick={handleConfirmCancelOrder}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {cancelLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Cancelling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>Confirm Cancel</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Footer Component ── */}
+      <Footer />
 
       {/* ── Cart Drawer & Address Selector ── */}
       <CartDrawer />

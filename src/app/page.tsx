@@ -7,6 +7,7 @@ import CategoryGrid from "@/components/CategoryGrid";
 import NearbyProducts from "@/components/NearbyProducts";
 import AddressModal from "@/components/AddressModal";
 import CartDrawer from "@/components/CartDrawer";
+import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
@@ -26,10 +27,13 @@ export default function Home() {
         <NearbyProducts />
       </main>
 
-      {/* ── 3. Address Selection Modal ── */}
+      {/* ── 3. Footer Component ── */}
+      <Footer />
+
+      {/* ── 4. Address Selection Modal ── */}
       <AddressModal />
 
-      {/* ── 4. Global Sliding Cart Drawer (Right to Left) ── */}
+      {/* ── 5. Global Sliding Cart Drawer (Right to Left) ── */}
       <CartDrawer />
     </div>
   );

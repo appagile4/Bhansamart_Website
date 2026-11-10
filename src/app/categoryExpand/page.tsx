@@ -6,6 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import AddressModal from "@/components/AddressModal";
 import CartDrawer from "@/components/CartDrawer";
+import Footer from "@/components/Footer";
 import { ProductItem } from "@/components/ProductCard";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { addToCart, removeFromCart } from "@/redux/slices/cartSlice";
@@ -472,7 +473,10 @@ function CategoryExpandContent() {
         </main>
       </div>
 
-      {/* ── 4. Modals ── */}
+      {/* ── 4. Footer ── */}
+      <Footer />
+
+      {/* ── 5. Modals ── */}
       <AddressModal />
       <CartDrawer />
     </div>
