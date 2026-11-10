@@ -1,88 +1,21 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { ALL_CATEGORY_ITEMS, CategoryCardData } from "@/lib/constants/categories";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { setSelectedCategory, setSelectedSubCategory } from "@/redux/slices/productsSlice";
-
-export interface CategoryItem {
-  _id?: string;
-  name: string;
-  slug: string;
-  image: string;
-  imageUrl?: string;
-  displayOrder?: number;
-}
-
-// 20 Root Categories matching the screenshot layout exactly
-const INITIAL_CATEGORIES: CategoryItem[] = [
-  { name: "Paan Corner", slug: "paan-corner", image: "/images/categories/paan-corner.png", displayOrder: 1 },
-  { name: "Dairy, Bread & Eggs", slug: "dairy-bread-eggs", image: "/images/categories/dairy-bread-eggs.png", displayOrder: 2 },
-  { name: "Fruits & Vegetables", slug: "fruits-vegetables", image: "/images/categories/fruits-vegetables.png", displayOrder: 3 },
-  { name: "Cold Drinks & Juices", slug: "cold-drinks-juices", image: "/images/categories/cold-drinks-juices.png", displayOrder: 4 },
-  { name: "Snacks & Munchies", slug: "snacks-munchies", image: "/images/categories/snacks-munchies.png", displayOrder: 5 },
-  { name: "Breakfast & Instant Food", slug: "breakfast-instant-food", image: "/images/categories/breakfast-instant-food.png", displayOrder: 6 },
-  { name: "Sweet Tooth", slug: "sweet-tooth", image: "/images/categories/sweet-tooth.png", displayOrder: 7 },
-  { name: "Bakery & Biscuits", slug: "bakery-biscuits", image: "/images/categories/bakery-biscuits.png", displayOrder: 8 },
-  { name: "Tea, Coffee & Milk Drinks", slug: "tea-coffee-milk-drinks", image: "/images/categories/tea-coffee-milk-drinks.png", displayOrder: 9 },
-  { name: "Atta, Rice & Dal", slug: "atta-rice-dal", image: "/images/categories/atta-rice-dal.png", displayOrder: 10 },
-  { name: "Masala, Oil & More", slug: "masala-oil-more", image: "/images/categories/masala-oil-more.png", displayOrder: 11 },
-  { name: "Sauces & Spreads", slug: "sauces-spreads", image: "/images/categories/sauces-spreads.png", displayOrder: 12 },
-  { name: "Chicken, Meat & Fish", slug: "chicken-meat-fish", image: "/images/categories/chicken-meat-fish.png", displayOrder: 13 },
-  { name: "Organic & Healthy Living", slug: "organic-healthy-living", image: "/images/categories/organic-healthy-living.png", displayOrder: 14 },
-  { name: "Baby Care", slug: "baby-care", image: "/images/categories/baby-care.png", displayOrder: 15 },
-  { name: "Pharma & Wellness", slug: "pharma-wellness", image: "/images/categories/pharma-wellness.png", displayOrder: 16 },
-  { name: "Cleaning Essentials", slug: "cleaning-essentials", image: "/images/categories/cleaning-essentials.png", displayOrder: 17 },
-  { name: "Home & Office", slug: "home-office", image: "/images/categories/home-office.png", displayOrder: 18 },
-  { name: "Personal Care", slug: "personal-care", image: "/images/categories/personal-care.png", displayOrder: 19 },
-  { name: "Pet Care", slug: "pet-care", image: "/images/categories/pet-care.png", displayOrder: 20 },
-];
+import { Sparkles } from "lucide-react";
 
 export default function CategoryGrid() {
   const dispatch = useAppDispatch();
-  const { selectedCategory } = useAppSelector((state) => state.products);
-  const [categories, setCategories] = useState<CategoryItem[]>(INITIAL_CATEGORIES);
+  const { selectedCategory, selectedSubCategory } = useAppSelector((state) => state.products);
 
-  // Fetch real categories and images from backend API
-  useEffect(() => {
-    let isMounted = true;
+  const handleCategoryClick = (item: CategoryCardData) => {
+    // Set both category and subcategory in Redux
+    dispatch(setSelectedCategory(item.categoryTitle || "all"));
+    dispatch(setSelectedSubCategory(item.name.replace("\n", " ")));
 
-    async function loadCategories() {
-      try {
-        const res = await fetch("/api/categories");
-        if (res.ok) {
-          const json = await res.json();
-          if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-            const sorted = [...json.data].sort(
-              (a: CategoryItem, b: CategoryItem) => (a.displayOrder || 999) - (b.displayOrder || 999)
-            );
-            if (isMounted) {
-              setCategories(sorted.slice(0, 20));
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to fetch live categories from backend, using default list:", err);
-      }
-    }
-
-    loadCategories();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleCategoryClick = (category: CategoryItem) => {
-    // If clicking already selected category, clear it to 'all'
-    if (selectedCategory.toLowerCase() === category.name.toLowerCase()) {
-      dispatch(setSelectedCategory("all"));
-      dispatch(setSelectedSubCategory("all"));
-      return;
-    }
-
-    dispatch(setSelectedCategory(category.name));
-    dispatch(setSelectedSubCategory("all"));
-
+    // Smooth scroll to products section
     const elem = document.getElementById("products-section");
     if (elem) {
       elem.scrollIntoView({ behavior: "smooth" });
@@ -91,63 +24,87 @@ export default function CategoryGrid() {
 
   return (
     <section className="w-full my-8">
-      {/* ── 20-Category Grid (10 columns desktop x 2 rows) ── */}
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-x-3.5 gap-y-6 sm:gap-x-4 sm:gap-y-7">
-        {categories.map((category, index) => {
-          const rawSrc = category.imageUrl || category.image;
-          const imageSrc =
-            rawSrc && rawSrc.length > 0
-              ? rawSrc.startsWith("http") || rawSrc.startsWith("/")
-                ? rawSrc
-                : `/images/categories/${rawSrc}`
-              : `/images/categories/${category.slug}.png`;
+      {/* ── Section Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Explore Categories
+            </h2>
+            <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-100 text-[#0C831F] text-xs font-bold px-2.5 py-0.5 rounded-full">
+              <Sparkles className="w-3.5 h-3.5 fill-[#0C831F]" />
+              Superfast Delivery
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">
+            Select any category to browse verified products from your nearest hub
+          </p>
+        </div>
 
-          const isSelected = selectedCategory.toLowerCase() === category.name.toLowerCase();
+        {/* Selected Category Clear Badge */}
+        {selectedCategory !== "all" || selectedSubCategory !== "all" ? (
+          <button
+            type="button"
+            onClick={() => {
+              dispatch(setSelectedCategory("all"));
+              dispatch(setSelectedSubCategory("all"));
+            }}
+            className="self-start sm:self-auto text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 cursor-pointer transition shadow-2xs"
+          >
+            <span>
+              Showing: {selectedSubCategory !== "all" ? selectedSubCategory : selectedCategory}
+            </span>
+            <span className="text-slate-400 font-normal ml-1">(Clear)</span>
+          </button>
+        ) : null}
+      </div>
 
-          return (
-            <div
-              key={category._id || category.slug || index}
-              onClick={() => handleCategoryClick(category)}
-              className="group flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
-            >
-              {/* ── Category Image Card Box (Light Blue Rounded Container) ── */}
-              <div
-                className={`w-full aspect-square bg-[#EBF5FA] hover:bg-[#E3F1F9] rounded-2xl flex items-center justify-center p-2.5 sm:p-3 transition-all duration-200 border shadow-[0_2px_8px_rgba(0,0,0,0.03)] group-hover:shadow-[0_4px_12px_rgba(0,0,0,0.07)] ${
-                  isSelected
-                    ? "border-[#0C831F] ring-2 ring-emerald-400 bg-emerald-50/60"
-                    : "border-transparent group-hover:border-blue-100"
-                }`}
+      {/* ── Single Unified Category Grid (All In One) ── */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/70 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
+          {ALL_CATEGORY_ITEMS.map((item) => {
+            const isSelected =
+              selectedSubCategory.toLowerCase() === item.name.replace("\n", " ").toLowerCase() ||
+              (selectedCategory.toLowerCase() === (item.categoryTitle || "").toLowerCase() &&
+                selectedSubCategory === "all");
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleCategoryClick(item)}
+                className="group flex flex-col items-center text-center cursor-pointer select-none focus:outline-none transition-transform hover:-translate-y-1"
               >
-                <div className="relative w-full h-full flex items-center justify-center">
+                {/* Image Card Box */}
+                <div
+                  className={`w-full aspect-square rounded-2xl flex items-center justify-center p-2.5 sm:p-3 transition-all duration-200 border shadow-2xs ${
+                    isSelected
+                      ? "bg-emerald-50 border-[#0C831F] ring-2 ring-emerald-300"
+                      : "bg-[#EBF5FA] hover:bg-[#E1EFF7] border-transparent group-hover:border-blue-100"
+                  }`}
+                >
                   <img
-                    src={imageSrc}
-                    alt={category.name}
+                    src={item.imageUrl}
+                    alt={item.name}
                     className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-108"
                     loading="lazy"
-                    onError={(e) => {
-                      // Fallback to local image if remote fails
-                      const target = e.currentTarget;
-                      if (!target.src.includes(`/images/categories/${category.slug}.png`)) {
-                        target.src = `/images/categories/${category.slug}.png`;
-                      }
-                    }}
                   />
                 </div>
-              </div>
 
-              {/* ── Category Name (2 lines centered text matching screenshot) ── */}
-              <p
-                className={`text-[11px] sm:text-xs font-semibold leading-tight text-center mt-2 line-clamp-2 min-h-[2rem] transition-colors duration-150 ${
-                  isSelected
-                    ? "text-[#0C831F] font-bold"
-                    : "text-slate-800 group-hover:text-emerald-700"
-                }`}
-              >
-                {category.name}
-              </p>
-            </div>
-          );
-        })}
+                {/* Category Label */}
+                <span
+                  className={`text-[11px] sm:text-xs leading-tight line-clamp-2 mt-2 font-medium ${
+                    isSelected
+                      ? "text-[#0C831F] font-bold"
+                      : "text-slate-700 group-hover:text-emerald-800"
+                  }`}
+                >
+                  {item.name.replace("\n", " ")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
