@@ -10,12 +10,11 @@ import {
 
 // ── Useful Links Data ──
 const USEFUL_LINKS_COL_1 = [
-  { label: "Blog", href: "#" },
-  { label: "Privacy Policy", href: "#" },
-  { label: "Terms & Conditions", href: "#" },
-  { label: "FAQs", href: "#" },
-  { label: "Security", href: "#" },
-  { label: "Contact Us", href: "#" },
+  { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Terms & Conditions", href: "/terms-and-conditions" },
+  { label: "FAQs", href: "/faqs" },
+  { label: "Security", href: "/security" },
+  { label: "Contact Us", href: "/contact-us" },
 ];
 
 const USEFUL_LINKS_COL_2 = [
