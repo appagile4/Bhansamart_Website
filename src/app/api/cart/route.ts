@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://bhansamart.webstudiomatrix.com/api";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 /**
  * GET /api/cart
@@ -20,7 +16,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/cart`, {
+    const backendUrl = getBackendApiUrl();
+    const res = await fetch(`${backendUrl}/cart`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -54,7 +51,8 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/cart/clear`, {
+    const backendUrl = getBackendApiUrl();
+    const res = await fetch(`${backendUrl}/cart/clear`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",

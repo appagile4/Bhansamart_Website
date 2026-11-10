@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
   const authHeader = req.headers.get("Authorization");
 
   if (!authHeader) {
@@ -20,6 +17,7 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    const backendUrl = getBackendApiUrl();
     const res = await fetch(`${backendUrl}/address/${id}/default`, {
       method: "PATCH",
       headers: {

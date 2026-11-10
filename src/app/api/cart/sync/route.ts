@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://bhansamart.webstudiomatrix.com/api";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 /**
  * POST /api/cart/sync
@@ -20,9 +16,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const backendUrl = getBackendApiUrl();
     const body = await req.json();
 
-    const res = await fetch(`${BACKEND_URL}/cart/sync`, {
+    const res = await fetch(`${backendUrl}/cart/sync`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

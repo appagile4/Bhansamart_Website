@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://bhansamart.webstudiomatrix.com/api";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 const DEFAULT_PAYMENT_METHODS = [
   {
@@ -45,7 +41,8 @@ const DEFAULT_PAYMENT_METHODS = [
  */
 export async function GET() {
   try {
-    const res = await fetch(`${BACKEND_URL}/checkout/payment-methods`, {
+    const backendUrl = getBackendApiUrl();
+    const res = await fetch(`${backendUrl}/checkout/payment-methods`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       next: { revalidate: 60 },

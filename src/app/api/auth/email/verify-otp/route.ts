@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 export async function POST(req: NextRequest) {
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
+  const backendUrl = getBackendApiUrl();
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 export async function GET(req: NextRequest) {
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
   const authHeader = req.headers.get("Authorization");
 
   if (!authHeader) {
@@ -15,6 +12,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const backendUrl = getBackendApiUrl();
     const res = await fetch(`${backendUrl}/orders/my-orders`, {
       headers: {
         "Content-Type": "application/json",

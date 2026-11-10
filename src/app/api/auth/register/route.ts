@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 export async function POST(req: NextRequest) {
-  const backendUrl =
-    process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://bhansamart.webstudiomatrix.com/api";
-
   try {
+    const backendUrl = getBackendApiUrl();
     const body = await req.json();
 
     const res = await fetch(`${backendUrl}/auth/register`, {

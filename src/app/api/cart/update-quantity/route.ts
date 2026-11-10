@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://bhansamart.webstudiomatrix.com/api";
+import { getBackendApiUrl } from "@/lib/apiConfig";
 
 /**
  * PUT /api/cart/update-quantity
@@ -20,9 +16,10 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
+    const backendUrl = getBackendApiUrl();
     const body = await req.json();
 
-    const res = await fetch(`${BACKEND_URL}/cart/update-quantity`, {
+    const res = await fetch(`${backendUrl}/cart/update-quantity`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
