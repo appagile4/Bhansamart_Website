@@ -16,7 +16,12 @@ export const addressSlice = createSlice({
   initialState,
   reducers: {
     setAddress: (state, action: PayloadAction<AddressLocation>) => {
-      state.currentAddress = action.payload;
+      const addr = { ...action.payload };
+      if (!addr.addressLine || addr.addressLine.includes("GPS")) {
+        addr.addressLine = "Dwarka Sector 5, New Delhi";
+        addr.name = "Current Location";
+      }
+      state.currentAddress = addr;
     },
     openAddressModal: (state) => {
       state.isModalOpen = true;

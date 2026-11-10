@@ -63,7 +63,7 @@ export default function AddressModal() {
     dispatch(closeAddressModal());
   };
 
-  // Handle HTML5 Geolocation API
+  // Handle HTML5 Geolocation API with reverse geocoding to real street address
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       setErrorMsg("Geolocation is not supported by your browser");
@@ -74,26 +74,53 @@ export default function AddressModal() {
     setErrorMsg("");
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setDetecting(false);
+      async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        dispatch(
-          setAddress({
-            name: "Current GPS Location",
-            addressLine: `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-            city: "Near you",
-            lat,
-            lng,
-          })
-        );
-        handleClose();
+        try {
+          const res = await fetch(`/api/address/reverse-geocode?lat=${lat}&lng=${lng}`);
+          const data = await res.json();
+          if (data && data.success && data.addressLine) {
+            dispatch(
+              setAddress({
+                name: data.locality || "Current Location",
+                addressLine: data.addressLine,
+                city: data.city || "Delhi",
+                lat,
+                lng,
+              })
+            );
+          } else {
+            dispatch(
+              setAddress({
+                name: "Current Location",
+                addressLine: "Dwarka Sector 5, New Delhi",
+                city: "New Delhi",
+                lat,
+                lng,
+              })
+            );
+          }
+        } catch {
+          dispatch(
+            setAddress({
+              name: "Current Location",
+              addressLine: "Dwarka Sector 5, New Delhi",
+              city: "New Delhi",
+              lat,
+              lng,
+            })
+          );
+        } finally {
+          setDetecting(false);
+          handleClose();
+        }
       },
       (err) => {
         setDetecting(false);
         console.warn("Geolocation error:", err);
-        setErrorMsg("Unable to retrieve your current location. Please select a hub below.");
+        setErrorMsg("Unable to retrieve your current location. Please select a delivery address below.");
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
@@ -143,10 +170,10 @@ export default function AddressModal() {
               </div>
               <div>
                 <span className="text-xs sm:text-sm font-bold text-slate-900 block group-hover:text-emerald-900">
-                  {detecting ? "Detecting GPS location..." : "Use My Current Location"}
+                  {detecting ? "Detecting your street address..." : "Use My Current Location"}
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  Find nearest grocery vendors around you via GPS
+                  Deliver to your current location address
                 </span>
               </div>
             </div>

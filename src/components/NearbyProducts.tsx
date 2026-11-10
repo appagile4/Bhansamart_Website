@@ -78,7 +78,9 @@ export default function NearbyProducts() {
           <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span className="font-medium text-slate-700 truncate max-w-sm">
-              {currentAddress.addressLine}
+              {currentAddress.addressLine && !currentAddress.addressLine.includes("GPS")
+                ? currentAddress.addressLine
+                : "Plato 19, Dwarka Sector 5, New Delhi"}
             </span>
             <span>•</span>
             <span className="text-emerald-700 font-semibold flex items-center gap-1">

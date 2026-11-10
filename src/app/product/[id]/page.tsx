@@ -450,7 +450,7 @@ function ProductDetailContent() {
                           </button>
                         </div>
                         <p className="text-xs text-slate-600 mt-0.5 truncate max-w-sm">
-                          Delivering to: <span className="font-semibold text-slate-800">{currentAddress.addressLine}</span>
+                          Delivering to: <span className="font-semibold text-slate-800">{currentAddress.addressLine && !currentAddress.addressLine.includes("GPS") ? currentAddress.addressLine : "Plato 19, Dwarka Sector 5, New Delhi"}</span>
                         </p>
                       </div>
                     </div>

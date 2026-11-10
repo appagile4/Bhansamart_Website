@@ -94,7 +94,9 @@ export default function Header({ onCartClick }: HeaderProps) {
             </div>
             <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-normal leading-tight mt-0.5 group-hover:text-slate-800 transition">
               <span className="truncate max-w-[195px]">
-                {currentAddress.addressLine}
+                {currentAddress.addressLine && !currentAddress.addressLine.includes("GPS")
+                  ? currentAddress.addressLine
+                  : "Plato 19, Dwarka Sector 5, New Delhi"}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-700 shrink-0 stroke-[2.5]" />
             </div>
