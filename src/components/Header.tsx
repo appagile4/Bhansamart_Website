@@ -7,6 +7,8 @@ import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logout } from "@/redux/slices/authSlice";
 import { openAddressModal } from "@/redux/slices/addressSlice";
 import { openCart } from "@/redux/slices/cartSlice";
+import { setSearchQuery } from "@/redux/slices/productsSlice";
+import { useRouter } from "next/navigation";
 
 const emptySubscribe = () => () => {};
 
@@ -29,6 +31,7 @@ export default function Header({ onCartClick }: HeaderProps) {
   const { totalCount, totalPrice } = useAppSelector((state) => state.cart);
   const { currentAddress } = useAppSelector((state) => state.address);
 
+  const router = useRouter();
   const [searchInput, setSearchInput] = useState("");
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const mounted = useSyncExternalStore(
@@ -38,6 +41,14 @@ export default function Header({ onCartClick }: HeaderProps) {
   );
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    dispatch(setSearchQuery(val));
+    if (typeof window !== "undefined" && window.location.pathname !== "/" && val.trim().length > 0) {
+      router.push("/");
+    }
+  };
 
   // Subtle animated cycling search placeholder matching quick commerce experience
   useEffect(() => {
@@ -97,7 +108,7 @@ export default function Header({ onCartClick }: HeaderProps) {
             <input
               type="text"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={SEARCH_PLACEHOLDERS[placeholderIndex]}
               className="w-full bg-transparent pl-11 pr-4 py-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 font-normal outline-none"
             />

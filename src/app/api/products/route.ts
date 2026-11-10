@@ -272,15 +272,20 @@ export async function GET(req: NextRequest) {
   const lng = searchParams.get("lng") || searchParams.get("longitude");
   const city = searchParams.get("city") || "";
   const category = searchParams.get("category") || "";
+  const subCategory = searchParams.get("subCategory") || "";
   const search = searchParams.get("search") || "";
+  const limit = searchParams.get("limit") || "100";
 
   // 1. Try to fetch from active Express Backend
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
-    const queryStr = searchParams.toString();
-    const targetUrl = `${backendUrl}/products${queryStr ? `?${queryStr}` : ""}`;
+    const params = new URLSearchParams(searchParams);
+    if (!params.has("limit")) {
+      params.set("limit", limit);
+    }
+    const targetUrl = `${backendUrl}/products?${params.toString()}`;
 
     const res = await fetch(targetUrl, {
       signal: controller.signal,
@@ -322,6 +327,13 @@ export async function GET(req: NextRequest) {
   if (category && category !== "all" && category !== "All") {
     filtered = filtered.filter(
       (p) => p.category?.toLowerCase().includes(category.toLowerCase())
+    );
+  }
+
+  // Optional subCategory filter
+  if (subCategory && subCategory !== "all" && subCategory !== "All") {
+    filtered = filtered.filter(
+      (p) => p.subCategory?.toLowerCase().includes(subCategory.toLowerCase())
     );
   }
 

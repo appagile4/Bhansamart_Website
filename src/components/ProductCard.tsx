@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Plus, Minus, Heart, Zap, Store } from "lucide-react";
 
 export interface ProductItem {
   _id: string;
+  id?: string;
   name: string;
   slug?: string;
   price: number;
@@ -12,21 +14,32 @@ export interface ProductItem {
   unit?: string;
   category?: string;
   subCategory?: string;
-  images?: Array<{ url: string; altText?: string }>;
+  description?: string;
+  shortDescription?: string;
+  brand?: string;
+  stock?: number;
+  inStock?: boolean;
   ratingsAverage?: number;
   ratingsCount?: number;
-  inStock?: boolean;
+  images?: Array<{ url: string; altText?: string; publicId?: string }>;
   vendor?: {
     _id?: string;
     businessDetails?: {
       businessName?: string;
+      city?: string;
+      categories?: string | string[];
     };
     sellerDetails?: {
       sellerName?: string;
       city?: string;
+      state?: string;
+      pincode?: string;
     };
     shippingLocations?: {
       city?: string;
+      warehouseAddress?: string;
+      latitude?: number;
+      longitude?: number;
     };
   };
 }
@@ -52,6 +65,9 @@ export default function ProductCard({
     return "/images/placeholder-product.png";
   });
 
+  const productId = product._id || product.id || "";
+  const productUrl = `/product/${productId}`;
+
   // Calculate discount percentage
   const discountPercent =
     product.originalPrice && product.originalPrice > product.price
@@ -61,7 +77,7 @@ export default function ProductCard({
   const vendorName =
     product.vendor?.businessDetails?.businessName ||
     product.vendor?.sellerDetails?.sellerName ||
-    "Local Supermart";
+    "BhansaMart Express Hub";
 
   return (
     <div className="group relative bg-white border border-slate-200/80 rounded-2xl p-3 flex flex-col justify-between shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all duration-200 hover:-translate-y-0.5 select-none">
@@ -77,6 +93,7 @@ export default function ProductCard({
         <button
           type="button"
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             setIsWishlisted(!isWishlisted);
           }}
@@ -90,19 +107,24 @@ export default function ProductCard({
           />
         </button>
 
-        {/* Product Image */}
-        <img
-          src={imgSrc}
-          alt={product.name}
-          className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-          onError={() => {
-            setImgSrc("https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80");
-          }}
-        />
+        {/* Product Image Clickable Link */}
+        <Link
+          href={productUrl}
+          className="w-full h-full flex items-center justify-center cursor-pointer"
+        >
+          <img
+            src={imgSrc}
+            alt={product.name}
+            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            onError={() => {
+              setImgSrc("https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80");
+            }}
+          />
+        </Link>
 
         {/* Delivery Time Pill (15-25 Mins) */}
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-700 shadow-xs border border-slate-100">
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-700 shadow-xs border border-slate-100 pointer-events-none">
           <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
           <span>15-25 MINS</span>
         </div>
@@ -117,13 +139,15 @@ export default function ProductCard({
             <span className="truncate">{vendorName}</span>
           </div>
 
-          {/* Product Name */}
-          <h3
-            className="text-xs sm:text-[13px] font-semibold text-slate-900 leading-tight line-clamp-2 min-h-[2rem] group-hover:text-emerald-700 transition-colors"
-            title={product.name}
-          >
-            {product.name}
-          </h3>
+          {/* Product Name Link */}
+          <Link href={productUrl} className="block cursor-pointer">
+            <h3
+              className="text-xs sm:text-[13px] font-semibold text-slate-900 leading-tight line-clamp-2 min-h-[2rem] group-hover:text-emerald-700 transition-colors"
+              title={product.name}
+            >
+              {product.name}
+            </h3>
+          </Link>
 
           {/* Unit / Weight */}
           <p className="text-[11px] text-slate-500 font-normal mt-1">
@@ -133,7 +157,7 @@ export default function ProductCard({
 
         {/* ── Price & Add to Cart Row ── */}
         <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-100">
-          <div className="flex flex-col">
+          <Link href={productUrl} className="flex flex-col cursor-pointer">
             <span className="text-sm sm:text-base font-extrabold text-slate-900 leading-none">
               ₹{product.price}
             </span>
@@ -142,22 +166,33 @@ export default function ProductCard({
                 ₹{product.originalPrice}
               </span>
             ) : null}
-          </div>
+          </Link>
 
           {/* Add To Cart Controller */}
           {quantity === 0 ? (
             <button
               type="button"
-              onClick={() => onAddToCart && onAddToCart(product)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onAddToCart) onAddToCart(product);
+              }}
               className="px-4 py-1.5 bg-[#0C831F] hover:bg-[#0a6f1a] active:scale-95 text-white font-bold text-xs rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer focus:outline-none"
             >
               <span>ADD</span>
             </button>
           ) : (
-            <div className="flex items-center bg-[#0C831F] text-white rounded-lg shadow-xs overflow-hidden">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center bg-[#0C831F] text-white rounded-lg shadow-xs overflow-hidden"
+            >
               <button
                 type="button"
-                onClick={() => onRemoveFromCart && onRemoveFromCart(product)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onRemoveFromCart) onRemoveFromCart(product);
+                }}
                 className="p-1.5 hover:bg-[#0a6f1a] transition cursor-pointer focus:outline-none"
                 title="Decrease quantity"
               >
@@ -166,7 +201,11 @@ export default function ProductCard({
               <span className="font-extrabold text-xs px-2 select-none">{quantity}</span>
               <button
                 type="button"
-                onClick={() => onAddToCart && onAddToCart(product)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onAddToCart) onAddToCart(product);
+                }}
                 className="p-1.5 hover:bg-[#0a6f1a] transition cursor-pointer focus:outline-none"
                 title="Increase quantity"
               >

@@ -3,18 +3,24 @@
 import React, { useEffect } from "react";
 import ProductCard from "./ProductCard";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { fetchProducts, setSelectedCategory } from "@/redux/slices/productsSlice";
+import {
+  fetchProducts,
+  setSelectedCategory,
+  setSelectedSubCategory,
+} from "@/redux/slices/productsSlice";
 import { addToCart, removeFromCart } from "@/redux/slices/cartSlice";
 import { openAddressModal } from "@/redux/slices/addressSlice";
-import { Store, Zap, MapPin, AlertCircle } from "lucide-react";
+import { Store, Zap, MapPin, AlertCircle, Sparkles, X } from "lucide-react";
+import { getSubCategoriesForCategory } from "@/lib/constants/categories";
 
-const CATEGORY_TABS = [
+const MAIN_CATEGORY_TABS = [
   { label: "All Products", value: "all" },
-  { label: "Dairy, Bread & Eggs", value: "dairy" },
-  { label: "Fruits & Vegetables", value: "vegetables" },
-  { label: "Atta, Rice & Dal", value: "atta" },
-  { label: "Snacks & Munchies", value: "snack" },
-  { label: "Oil & Masala", value: "oil" },
+  { label: "Grocery & Kitchen", value: "Grocery & Kitchen" },
+  { label: "Snacks & Drinks", value: "Snacks & Drinks" },
+  { label: "Beauty & Personal Care", value: "Beauty & Personal Care" },
+  { label: "Baby", value: "Baby" },
+  { label: "School & Stationery", value: "School, Office & Stationery" },
+  { label: "Gifting", value: "Gifting" },
 ];
 
 export default function NearbyProducts() {
@@ -25,10 +31,13 @@ export default function NearbyProducts() {
     items: products,
     loading,
     selectedCategory,
+    selectedSubCategory,
+    searchQuery,
     eligibleVendorsCount,
     isOutsideDeliveryZone,
   } = useAppSelector((state) => state.products);
 
+  // Re-fetch products when address or category/subCategory changes
   useEffect(() => {
     dispatch(
       fetchProducts({
@@ -36,19 +45,41 @@ export default function NearbyProducts() {
         lng: currentAddress.lng,
         city: currentAddress.city,
         category: selectedCategory,
+        subCategory: selectedSubCategory,
+        search: searchQuery,
       })
     );
-  }, [dispatch, currentAddress.lat, currentAddress.lng, currentAddress.city, selectedCategory]);
+  }, [
+    dispatch,
+    currentAddress.lat,
+    currentAddress.lng,
+    currentAddress.city,
+    selectedCategory,
+    selectedSubCategory,
+    searchQuery,
+  ]);
+
+  // Subcategories available for current category selection
+  const availableSubCategories =
+    selectedCategory && selectedCategory !== "all"
+      ? getSubCategoriesForCategory(selectedCategory)
+      : [];
 
   return (
-    <section className="w-full mt-6 mb-16">
-      
+    <section id="products-section" className="w-full mt-6 mb-16 scroll-mt-24">
       {/* ── Section Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-              Products Near You
+              {selectedCategory === "all"
+                ? "Products Near You"
+                : `${selectedCategory}`}
+              {selectedSubCategory !== "all" ? (
+                <span className="text-emerald-700 font-semibold text-sm ml-2">
+                  • {selectedSubCategory}
+                </span>
+              ) : null}
             </h2>
             <span className="bg-emerald-100 text-[#0C831F] text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <Zap className="w-3 h-3 fill-[#0C831F]" />
@@ -65,8 +96,8 @@ export default function NearbyProducts() {
             <span className="text-emerald-700 font-semibold flex items-center gap-1">
               <Store className="w-3 h-3" />
               {eligibleVendorsCount > 0
-                ? `${eligibleVendorsCount} nearby stores delivering to your location`
-                : "Searching nearby stores"}
+                ? `${eligibleVendorsCount} nearby stores delivering live products`
+                : "Live Express Catalog"}
             </span>
           </div>
         </div>
@@ -82,16 +113,19 @@ export default function NearbyProducts() {
         </button>
       </div>
 
-      {/* ── Category Filter Pills ── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-5 no-scrollbar">
-        {CATEGORY_TABS.map((tab) => {
-          const isActive = selectedCategory === tab.value;
+      {/* ── Main Category Filter Tabs ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar">
+        {MAIN_CATEGORY_TABS.map((tab) => {
+          const isActive = selectedCategory.toLowerCase() === tab.value.toLowerCase();
           return (
             <button
               key={tab.value}
               type="button"
-              onClick={() => dispatch(setSelectedCategory(tab.value))}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer focus:outline-none ${
+              onClick={() => {
+                dispatch(setSelectedCategory(tab.value));
+                dispatch(setSelectedSubCategory("all"));
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer focus:outline-none select-none ${
                 isActive
                   ? "bg-[#0C831F] text-white shadow-xs"
                   : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80"
@@ -102,6 +136,57 @@ export default function NearbyProducts() {
           );
         })}
       </div>
+
+      {/* ── Subcategory Secondary Filter Chips ── */}
+      {availableSubCategories.length > 0 ? (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-5 no-scrollbar bg-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100">
+          <span className="text-[11px] font-bold text-emerald-800 uppercase px-2 shrink-0">
+            Subcategories:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => dispatch(setSelectedSubCategory("all"))}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+              selectedSubCategory === "all"
+                ? "bg-[#0C831F] text-white"
+                : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/70"
+            }`}
+          >
+            All in {selectedCategory}
+          </button>
+
+          {availableSubCategories.map((sub) => {
+            const isSubActive =
+              selectedSubCategory.toLowerCase() === sub.toLowerCase();
+            return (
+              <button
+                key={sub}
+                type="button"
+                onClick={() => dispatch(setSelectedSubCategory(sub))}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                  isSubActive
+                    ? "bg-[#0C831F] text-white"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/70"
+                }`}
+              >
+                {sub}
+              </button>
+            );
+          })}
+
+          {selectedSubCategory !== "all" ? (
+            <button
+              type="button"
+              onClick={() => dispatch(setSelectedSubCategory("all"))}
+              className="p-1 text-slate-400 hover:text-slate-600 rounded-md transition cursor-pointer ml-1"
+              title="Clear subcategory"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* ── Products Grid or Skeletons / Empty State ── */}
       {loading ? (
@@ -127,17 +212,24 @@ export default function NearbyProducts() {
             <AlertCircle className="w-6 h-6" />
           </div>
           <h3 className="text-base font-bold text-slate-900 mb-1">
-            No Active Stores at This Exact Location
+            No Products Found in this Category
           </h3>
           <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-            Instant 15-25 minute delivery is currently operational in Dwarka, Rohini, Kathmandu, and Meerut.
+            {selectedCategory !== "all"
+              ? `Currently there are no active items listed under "${selectedCategory}${
+                  selectedSubCategory !== "all" ? ` > ${selectedSubCategory}` : ""
+                }" in this delivery location.`
+              : "No active products are currently available in this delivery zone."}
           </p>
           <button
             type="button"
-            onClick={() => dispatch(openAddressModal())}
+            onClick={() => {
+              dispatch(setSelectedCategory("all"));
+              dispatch(setSelectedSubCategory("all"));
+            }}
             className="px-5 py-2.5 bg-[#0C831F] hover:bg-[#0a6f1a] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
           >
-            Switch to a Nearby Delivery Hub
+            Show All Available Products
           </button>
         </div>
       ) : (
