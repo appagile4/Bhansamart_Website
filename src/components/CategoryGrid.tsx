@@ -1,25 +1,25 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { ALL_CATEGORY_ITEMS, CategoryCardData } from "@/lib/constants/categories";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { setSelectedCategory, setSelectedSubCategory } from "@/redux/slices/productsSlice";
 import { Sparkles } from "lucide-react";
 
 export default function CategoryGrid() {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const { selectedCategory, selectedSubCategory } = useAppSelector((state) => state.products);
 
   const handleCategoryClick = (item: CategoryCardData) => {
-    // Set both category and subcategory in Redux
-    dispatch(setSelectedCategory(item.categoryTitle || "all"));
-    dispatch(setSelectedSubCategory(item.name.replace("\n", " ")));
-
-    // Smooth scroll to products section
-    const elem = document.getElementById("products-section");
-    if (elem) {
-      elem.scrollIntoView({ behavior: "smooth" });
-    }
+    const cat = item.categoryTitle || "Grocery & Kitchen";
+    const sub = item.name.replace("\n", " ");
+    dispatch(setSelectedCategory(cat));
+    dispatch(setSelectedSubCategory(sub));
+    router.push(
+      `/categoryExpand?category=${encodeURIComponent(cat)}&subCategory=${encodeURIComponent(sub)}`
+    );
   };
 
   return (
