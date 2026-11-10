@@ -10,8 +10,7 @@ import {
 } from "@/redux/slices/productsSlice";
 import { addToCart, removeFromCart } from "@/redux/slices/cartSlice";
 import { openAddressModal } from "@/redux/slices/addressSlice";
-import { Store, Zap, MapPin, AlertCircle, Sparkles, X } from "lucide-react";
-import { getSubCategoriesForCategory } from "@/lib/constants/categories";
+import { Store, Zap, MapPin, AlertCircle } from "lucide-react";
 
 const MAIN_CATEGORY_TABS = [
   { label: "All Products", value: "all" },
@@ -58,12 +57,6 @@ export default function NearbyProducts() {
     selectedSubCategory,
     searchQuery,
   ]);
-
-  // Subcategories available for current category selection
-  const availableSubCategories =
-    selectedCategory && selectedCategory !== "all"
-      ? getSubCategoriesForCategory(selectedCategory)
-      : [];
 
   return (
     <section id="products-section" className="w-full mt-6 mb-16 scroll-mt-24">
@@ -136,57 +129,6 @@ export default function NearbyProducts() {
           );
         })}
       </div>
-
-      {/* ── Subcategory Secondary Filter Chips ── */}
-      {availableSubCategories.length > 0 ? (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-5 no-scrollbar bg-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100">
-          <span className="text-[11px] font-bold text-emerald-800 uppercase px-2 shrink-0">
-            Subcategories:
-          </span>
-
-          <button
-            type="button"
-            onClick={() => dispatch(setSelectedSubCategory("all"))}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-              selectedSubCategory === "all"
-                ? "bg-[#0C831F] text-white"
-                : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/70"
-            }`}
-          >
-            All in {selectedCategory}
-          </button>
-
-          {availableSubCategories.map((sub) => {
-            const isSubActive =
-              selectedSubCategory.toLowerCase() === sub.toLowerCase();
-            return (
-              <button
-                key={sub}
-                type="button"
-                onClick={() => dispatch(setSelectedSubCategory(sub))}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                  isSubActive
-                    ? "bg-[#0C831F] text-white"
-                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/70"
-                }`}
-              >
-                {sub}
-              </button>
-            );
-          })}
-
-          {selectedSubCategory !== "all" ? (
-            <button
-              type="button"
-              onClick={() => dispatch(setSelectedSubCategory("all"))}
-              className="p-1 text-slate-400 hover:text-slate-600 rounded-md transition cursor-pointer ml-1"
-              title="Clear subcategory"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
       {/* ── Products Grid or Skeletons / Empty State ── */}
       {loading ? (
