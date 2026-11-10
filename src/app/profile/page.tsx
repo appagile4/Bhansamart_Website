@@ -12,6 +12,7 @@ import {
   updateProfile,
   changeUserPassword,
   fetchCurrentUser,
+  updateLocalUser,
   UserProfile,
 } from "@/redux/slices/authSlice";
 import { setAddress } from "@/redux/slices/addressSlice";
@@ -46,7 +47,6 @@ import {
   AlertCircle,
   Loader2,
   KeyRound,
-  RefreshCw,
   Heart,
   Trash2,
   RotateCcw,
@@ -127,19 +127,18 @@ const PRESET_AVATARS = [
 function ProfileTabContent({
   user,
   onRefresh,
-  isRefreshing,
 }: {
   user: UserProfile | null;
   onRefresh: () => void;
-  isRefreshing: boolean;
 }) {
   const dispatch = useAppDispatch();
 
   // ── Profile Form State (Initialized with real user data) ──
   const [fullName, setFullName] = useState(user?.name || "");
-  const [email] = useState(user?.email || "customer@bhansamart.com");
+  const [email, setEmail] = useState(user?.email || "customer@bhansamart.com");
   const [gender, setGender] = useState(user?.gender || "Other");
-  const [phone, setPhone] = useState(user?.phone || "");
+  // Mobile number: permanently non-changeable as per requirements
+  const phone = user?.phone || "9868686868";
   const [dob, setDob] = useState(() => {
     if (user?.dateOfBirth) {
       try {
@@ -172,6 +171,130 @@ function ProfileTabContent({
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [customAvatarInput, setCustomAvatarInput] = useState("");
 
+  // ── Email Change with OTP Verification State ──
+  const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [emailStep, setEmailStep] = useState<"enter-email" | "enter-otp">("enter-email");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [emailOtpError, setEmailOtpError] = useState<string | null>(null);
+  const [emailOtpSuccess, setEmailOtpSuccess] = useState<string | null>(null);
+  const [otpPreviewCode, setOtpPreviewCode] = useState<string | null>(null);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+
+  // Countdown timer for resending OTP
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown((c) => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
+
+  // ── Handle Send OTP for Email Change ──
+  const handleSendEmailOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setEmailOtpError(null);
+    setEmailOtpSuccess(null);
+
+    const targetEmail = newEmailInput.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!targetEmail || !emailRegex.test(targetEmail)) {
+      setEmailOtpError("Please enter a valid email address.");
+      return;
+    }
+    if (targetEmail === email.toLowerCase().trim()) {
+      setEmailOtpError("The new email cannot be the same as your current email.");
+      return;
+    }
+
+    const activeToken =
+      typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
+    if (!activeToken) {
+      setEmailOtpError("Please log in to change your email address.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch("/api/auth/email/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${activeToken}`,
+        },
+        body: JSON.stringify({ newEmail: targetEmail }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailOtpSuccess(data.message || `Verification code sent to ${targetEmail}`);
+        if (data.otpPreview) {
+          setOtpPreviewCode(data.otpPreview);
+        }
+        setEmailStep("enter-otp");
+        setOtpCountdown(60);
+      } else {
+        setEmailOtpError(data.message || "Failed to send verification code. Please try again.");
+      }
+    } catch {
+      setEmailOtpError("Network error. Please try again.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // ── Handle Verify OTP & Update Email ──
+  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailOtpError(null);
+    setEmailOtpSuccess(null);
+
+    if (!otpInput || otpInput.trim().length < 4) {
+      setEmailOtpError("Please enter the complete 6-digit verification code.");
+      return;
+    }
+
+    const activeToken =
+      typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
+    if (!activeToken) {
+      setEmailOtpError("Please log in to continue.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch("/api/auth/email/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${activeToken}`,
+        },
+        body: JSON.stringify({
+          newEmail: newEmailInput.trim().toLowerCase(),
+          otp: otpInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const verifiedEmail = newEmailInput.trim().toLowerCase();
+        setEmail(verifiedEmail);
+        dispatch(updateLocalUser({ email: verifiedEmail, isEmailVerified: true }));
+        setProfileSuccessMsg(`Email address successfully updated and verified to ${verifiedEmail}!`);
+        setEmailOtpSuccess("Email verified successfully!");
+        setTimeout(() => {
+          setIsChangeEmailOpen(false);
+          onRefresh();
+        }, 1200);
+      } else {
+        setEmailOtpError(data.message || "Invalid or expired verification code.");
+      }
+    } catch {
+      setEmailOtpError("Network error verifying code. Please try again.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   // ── Handle Save Profile Changes ──
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +313,6 @@ function ProfileTabContent({
           name: fullName.trim(),
           gender,
           dateOfBirth: dob || undefined,
-          phone: phone.trim() || undefined,
           address: addressLine.trim() || undefined,
           avatar: avatarUrl,
         })
@@ -265,35 +387,14 @@ function ProfileTabContent({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Header Title with Live Sync Indicator and Refresh Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              My Profile
-            </h2>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live Backend
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Real user account details fetched from BhansaMart backend
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
-          title="Fetch latest profile data from server"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-emerald-600" : ""}`}
-          />
-          <span>{isRefreshing ? "Syncing..." : "Sync Profile"}</span>
-        </button>
+      {/* Header Title */}
+      <div>
+        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+          My Profile
+        </h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Manage your account credentials and personal preferences
+        </p>
       </div>
 
       {/* ── 1. Profile Picture / Avatar Card (profile) ── */}
@@ -389,15 +490,32 @@ function ProfileTabContent({
             </div>
           </div>
 
-          {/* Email Address (email) */}
+          {/* Email Address (email - changeable with OTP verification) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700">
                 Email Address
               </label>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                Verified
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  Verified
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewEmailInput("");
+                    setOtpInput("");
+                    setEmailStep("enter-email");
+                    setEmailOtpError(null);
+                    setEmailOtpSuccess(null);
+                    setOtpPreviewCode(null);
+                    setIsChangeEmailOpen(true);
+                  }}
+                  className="text-[11px] font-bold text-[#0B4D58] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  Change Email
+                </button>
+              </div>
             </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -407,17 +525,42 @@ function ProfileTabContent({
                 type="email"
                 value={email}
                 readOnly
-                title="Registered email address"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-600 cursor-not-allowed select-text"
+                title="Registered email address. Click 'Change' to update with OTP verification."
+                className="w-full pl-10 pr-24 py-2.5 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 cursor-not-allowed select-text font-medium"
               />
+              <button
+                type="button"
+                onClick={() => {
+                  setNewEmailInput("");
+                  setOtpInput("");
+                  setEmailStep("enter-email");
+                  setEmailOtpError(null);
+                  setEmailOtpSuccess(null);
+                  setOtpPreviewCode(null);
+                  setIsChangeEmailOpen(true);
+                }}
+                className="absolute inset-y-1.5 right-1.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-[#0B4D58] text-xs font-bold rounded-lg transition shadow-2xs cursor-pointer flex items-center gap-1"
+                title="Change your email with OTP verification"
+              >
+                <span>Change</span>
+              </button>
             </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Email can be changed with 6-digit OTP verification.
+            </p>
           </div>
 
-          {/* Mobile Number (mobile number) */}
+          {/* Mobile Number (mobile number - non-changeable) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Mobile Number
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Mobile Number
+              </label>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5 text-slate-400" />
+                Non-changeable
+              </span>
+            </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Phone className="w-4 h-4" />
@@ -425,11 +568,14 @@ function ProfileTabContent({
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. 9868686868 or +91 9876543210"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-[#0B4D58] transition"
+                readOnly
+                title="Mobile number is permanently bound to this account and cannot be modified."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-600 cursor-not-allowed select-text font-medium"
               />
             </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Mobile number is permanently bound to this account for security.
+            </p>
           </div>
 
           {/* Date of Birth (dob) */}
@@ -728,6 +874,196 @@ function ProfileTabContent({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Change Email Address OTP Modal ── */}
+      {isChangeEmailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 border border-slate-200 animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#0B4D58]" />
+                <span>Change Email Address</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsChangeEmailOpen(false)}
+                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error & Success Messages */}
+            {emailOtpError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+                <span>{emailOtpError}</span>
+              </div>
+            )}
+
+            {emailOtpSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{emailOtpSuccess}</span>
+              </div>
+            )}
+
+            {emailStep === "enter-email" ? (
+              /* Step 1: Input New Email */
+              <form onSubmit={handleSendEmailOtp} className="space-y-4">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block mb-0.5">
+                    Current Registered Email
+                  </span>
+                  <span className="text-xs font-semibold text-slate-700">{email}</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    New Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={newEmailInput}
+                      onChange={(e) => setNewEmailInput(e.target.value)}
+                      placeholder="e.g. new.email@gmail.com"
+                      required
+                      autoFocus
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-[#0B4D58]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                    We will send a 6-digit verification code (OTP) to this address to verify your ownership.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsChangeEmailOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSendingOtp}
+                    className="px-5 py-2 bg-[#0B4D58] hover:bg-[#083a42] text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSendingOtp ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Sending Code...</span>
+                      </>
+                    ) : (
+                      <span>Send OTP</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Step 2: Enter OTP */
+              <form onSubmit={handleVerifyEmailOtp} className="space-y-4">
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/80">
+                  <span className="text-[10px] text-emerald-800 uppercase tracking-wider font-bold block mb-0.5">
+                    Verification Code Sent
+                  </span>
+                  <p className="text-xs text-emerald-900">
+                    We sent a 6-digit OTP code to: <strong>{newEmailInput}</strong>
+                  </p>
+                </div>
+
+                {otpPreviewCode && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                    <span>
+                      Dev OTP: <strong>{otpPreviewCode}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpInput(otpPreviewCode)}
+                      className="text-[11px] font-bold text-amber-800 underline cursor-pointer"
+                    >
+                      Fill OTP
+                    </button>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Enter 6-Digit OTP *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                    placeholder="e.g. 123456"
+                    required
+                    autoFocus
+                    className="w-full text-center tracking-[0.3em] font-mono text-lg py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none focus:border-[#0B4D58]"
+                  />
+                  <div className="flex items-center justify-between mt-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailStep("enter-email");
+                        setOtpInput("");
+                        setEmailOtpError(null);
+                      }}
+                      className="text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                    >
+                      ← Change email
+                    </button>
+
+                    {otpCountdown > 0 ? (
+                      <span className="text-slate-400">Resend in {otpCountdown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendEmailOtp}
+                        disabled={isSendingOtp}
+                        className="text-[#0B4D58] font-bold hover:underline cursor-pointer"
+                      >
+                        Resend Code
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsChangeEmailOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isVerifyingOtp || otpInput.length < 4}
+                    className="px-5 py-2 bg-[#0C831F] hover:bg-[#0a6f1a] text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {isVerifyingOtp ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Verify & Update Email</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -1348,7 +1684,6 @@ function ProfileContent() {
               key={`${user?._id || "guest"}-${user?.name || ""}-${user?.email || ""}-${user?.phone || ""}-${user?.gender || ""}-${user?.dateOfBirth || ""}-${user?.avatar || ""}`}
               user={user}
               onRefresh={handleRefresh}
-              isRefreshing={isRefreshing}
             />
           )}
 
