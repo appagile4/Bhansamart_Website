@@ -50,6 +50,10 @@ import {
   Heart,
   Trash2,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  Truck,
+  Clock,
 } from "lucide-react";
 
 interface SavedAddress {
@@ -75,22 +79,43 @@ interface OrderItem {
   unit?: string;
 }
 
+interface StatusHistoryItem {
+  status: string;
+  timestamp: string;
+  reason?: string;
+  updatedBy?: string;
+}
+
 interface UserOrder {
   _id: string;
   orderNumber?: string;
   orderStatus: string;
   items: OrderItem[];
+  itemsTotal?: number;
+  handlingCharge?: number;
+  deliveryCharge?: number;
+  discount?: number;
+  totalAmount?: number;
   pricing?: {
     grandTotal?: number;
     itemsTotal?: number;
     deliveryFee?: number;
   };
-  totalAmount?: number;
   paymentMethod?: string;
+  paymentStatus?: string;
   deliveryAddress?: {
     addressLine?: string;
     city?: string;
+    street?: string;
+    houseNo?: string;
+    landmark?: string;
+    phone?: string;
+    type?: string;
+    latitude?: number;
+    longitude?: number;
   };
+  statusHistory?: StatusHistoryItem[];
+  estimatedDeliveryTime?: string;
   createdAt: string;
 }
 
@@ -113,6 +138,23 @@ interface UserReview {
   date: string;
   isVerifiedBuyer: boolean;
 }
+
+const ORDER_TRACKING_STEPS = [
+  { key: "PLACED", label: "Order Placed", desc: "Received at hub" },
+  { key: "ACCEPTED", label: "Store Accepted", desc: "Items verified" },
+  { key: "PREPARING", label: "Packing", desc: "Packed & verified" },
+  { key: "OUT_FOR_DELIVERY", label: "Out for Delivery", desc: "Rider on the way" },
+  { key: "DELIVERED", label: "Delivered", desc: "At your doorstep" },
+];
+
+const getActiveOrderStep = (status: string): number => {
+  const s = (status || "").toUpperCase();
+  if (s === "DELIVERED") return 4;
+  if (s === "OUT_FOR_DELIVERY") return 3;
+  if (s === "PREPARING" || s === "READY_FOR_PICKUP") return 2;
+  if (s === "ACCEPTED") return 1;
+  return 0; // PLACED
+};
 
 const PRESET_AVATARS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80",
@@ -1126,6 +1168,14 @@ function ProfileContent() {
     },
   ]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Record<string, boolean>>({});
+
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrderIds((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
 
   // ── 2. My Address Book State ──
   const [addresses, setAddresses] = useState<SavedAddress[]>([
@@ -1725,6 +1775,8 @@ function ProfileContent() {
                     const isDelivered = ord.orderStatus?.toLowerCase().includes("delivered");
                     const isOut = ord.orderStatus?.toLowerCase().includes("out");
                     const isCancelled = ord.orderStatus?.toLowerCase().includes("cancel");
+                    const isExpanded = !!expandedOrderIds[ord._id];
+                    const activeStep = getActiveOrderStep(ord.orderStatus);
 
                     return (
                       <div
@@ -1814,11 +1866,30 @@ function ProfileContent() {
                         {/* Order Footer Row */}
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-3.5 border-t border-slate-100 text-xs">
                           <div className="flex items-center gap-2 text-slate-600">
-                            <span>Payment: <strong className="text-slate-800">{ord.paymentMethod || "COD"}</strong></span>
+                            <span>Payment: <strong className="text-slate-800">{ord.paymentMethod || "Cash on delivery"}</strong></span>
                             <span>• Total: <strong className="text-slate-900 text-sm">₹{ord.pricing?.grandTotal || ord.totalAmount || 0}</strong></span>
                           </div>
 
                           <div className="flex items-center gap-2">
+                            {/* ── Tracking Dropdown Toggle Button ── */}
+                            <button
+                              type="button"
+                              onClick={() => toggleOrderExpand(ord._id)}
+                              className={`px-3 py-1.5 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border ${
+                                isExpanded
+                                  ? "bg-emerald-50 text-[#0C831F] border-emerald-300 ring-2 ring-emerald-200/60 shadow-xs"
+                                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              <Truck className="w-3.5 h-3.5 text-[#0C831F]" />
+                              <span>{isExpanded ? "Hide Tracking" : "Track Order"}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+                              )}
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => handleReorder(ord)}
@@ -1829,6 +1900,175 @@ function ProfileContent() {
                             </button>
                           </div>
                         </div>
+
+                        {/* ── Expandable Tracking Details Dropdown ── */}
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            
+                            {/* 1. Live Tracking Stepper Header */}
+                            <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/70">
+                              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200/60">
+                                <div className="flex items-center gap-2">
+                                  <Truck className="w-4 h-4 text-emerald-700" />
+                                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                                    Live Order Tracking
+                                  </h4>
+                                </div>
+                                <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1 bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                  <Clock className="w-3 h-3 text-emerald-600" />
+                                  {ord.estimatedDeliveryTime || "15-25 Mins Express Delivery"}
+                                </span>
+                              </div>
+
+                              {isCancelled ? (
+                                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 flex items-center gap-2">
+                                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                  <span>This order was cancelled. Any prepaid payments will be refunded within 3-5 business days.</span>
+                                </div>
+                              ) : (
+                                <div className="relative flex items-center justify-between px-2 sm:px-6 my-2">
+                                  {/* Progress Track Line */}
+                                  <div className="absolute left-6 right-6 top-3.5 h-1 bg-slate-200 -z-0" />
+                                  <div
+                                    className="absolute left-6 top-3.5 h-1 bg-emerald-600 transition-all duration-500 -z-0"
+                                    style={{
+                                      width: `${(Math.min(activeStep, 4) / 4) * 88}%`,
+                                    }}
+                                  />
+
+                                  {ORDER_TRACKING_STEPS.map((stg, idx) => {
+                                    const isDone = idx <= activeStep;
+                                    const isCurrent = idx === activeStep;
+
+                                    return (
+                                      <div key={stg.key} className="flex flex-col items-center text-center relative z-10">
+                                        <div
+                                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
+                                            isDone
+                                              ? "bg-[#0C831F] text-white ring-4 ring-emerald-100"
+                                              : "bg-white text-slate-400 border border-slate-300"
+                                          }`}
+                                        >
+                                          {isDone ? (
+                                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                          ) : (
+                                            <span>{idx + 1}</span>
+                                          )}
+                                        </div>
+                                        <span
+                                          className={`text-[10px] sm:text-[11px] mt-1.5 font-bold max-w-[70px] leading-tight ${
+                                            isCurrent
+                                              ? "text-emerald-700 font-extrabold"
+                                              : isDone
+                                              ? "text-slate-800"
+                                              : "text-slate-400"
+                                          }`}
+                                        >
+                                          {stg.label}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 hidden sm:block mt-0.5">
+                                          {stg.desc}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 2. Delivery Address & Bill Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* Delivery Address Card */}
+                              <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-200/60 space-y-2 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-slate-800 pb-1.5 border-b border-slate-200/60">
+                                  <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Delivery Address Details</span>
+                                </div>
+                                <div className="text-[11px] text-slate-700 leading-relaxed font-medium space-y-1">
+                                  <p className="font-semibold text-slate-900">
+                                    {ord.deliveryAddress?.addressLine || "Home Delivery Address"}
+                                  </p>
+                                  {ord.deliveryAddress?.houseNo ? (
+                                    <p className="text-slate-600">Flat / House: {ord.deliveryAddress.houseNo}</p>
+                                  ) : null}
+                                  {ord.deliveryAddress?.landmark ? (
+                                    <p className="text-slate-600">Landmark: {ord.deliveryAddress.landmark}</p>
+                                  ) : null}
+                                  {ord.deliveryAddress?.city ? (
+                                    <p className="text-slate-600">City: {ord.deliveryAddress.city}</p>
+                                  ) : null}
+                                  {ord.deliveryAddress?.phone ? (
+                                    <p className="text-slate-700 flex items-center gap-1 pt-1 font-semibold">
+                                      <Phone className="w-3 h-3 text-slate-400" />
+                                      <span>Contact Phone: {ord.deliveryAddress.phone}</span>
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {/* Bill & Payment Summary Card */}
+                              <div className="bg-slate-50/70 rounded-xl p-3.5 border border-slate-200/60 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-slate-800 pb-1.5 border-b border-slate-200/60">
+                                  <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Bill & Payment Summary</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600 text-[11px]">
+                                  <span>Items Total</span>
+                                  <span className="font-semibold text-slate-800">
+                                    ₹{ord.pricing?.itemsTotal || ord.itemsTotal || ord.items.reduce((s, it) => s + it.price * it.quantity, 0)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-slate-600 text-[11px]">
+                                  <span>Handling Charge</span>
+                                  <span className="font-semibold text-slate-800">
+                                    ₹{ord.handlingCharge ?? 30}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-slate-600 text-[11px]">
+                                  <span>Delivery Charge</span>
+                                  <span className="font-semibold text-emerald-700">
+                                    {ord.deliveryCharge === 0 || ord.pricing?.deliveryFee === 0 ? "FREE" : `₹${ord.deliveryCharge || ord.pricing?.deliveryFee || 0}`}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between font-bold text-slate-900 pt-1.5 border-t border-slate-200/60 text-xs">
+                                  <span>Grand Total</span>
+                                  <span className="text-sm font-black text-slate-900">
+                                    ₹{ord.pricing?.grandTotal || ord.totalAmount || 0}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 pt-0.5">
+                                  Payment Method: <span className="font-semibold text-slate-700">{ord.paymentMethod || "Cash on delivery"}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Status History Updates Log (If present from backend) */}
+                            {ord.statusHistory && ord.statusHistory.length > 0 ? (
+                              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/60 text-xs">
+                                <span className="font-bold text-slate-800 block mb-2 text-[11px] uppercase tracking-wider">
+                                  Status Timeline Log
+                                </span>
+                                <div className="space-y-1.5">
+                                  {ord.statusHistory.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between text-slate-600 text-[11px]">
+                                      <span className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                                        <span className="font-semibold text-slate-800">{h.status}</span>
+                                        {h.reason ? <span className="text-slate-500">• {h.reason}</span> : null}
+                                      </span>
+                                      <span className="text-slate-400 font-mono text-[10px]">
+                                        {new Date(h.timestamp).toLocaleTimeString("en-US", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
