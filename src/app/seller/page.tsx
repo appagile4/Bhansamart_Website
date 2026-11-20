@@ -8,301 +8,354 @@ import {
   Mail,
   Eye,
   EyeOff,
-  Store,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
   AlertCircle,
-  Truck,
-  TrendingUp,
-  Boxes,
+  CheckCircle2,
+  Smartphone,
+  Check,
+  Store,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { useAppDispatch } from "@/redux/hooks";
+import { useVendor } from "@/lib/seller/useVendor";
 import {
   loginVendorPassword,
+  sendVendorOtp,
+  verifyVendorOtp,
   clearVendorAlerts,
+  VendorSessionResponse,
 } from "@/redux/slices/vendorSlice";
+import SellerAuthShell, { VendorPortalBadge } from "@/components/vendor/SellerAuthShell";
+import OtpInput from "@/components/vendor/OtpInput";
+import {
+  sellerErrorBox,
+  sellerHelper,
+  sellerInputIcon,
+  sellerInputWithIcon,
+  sellerLabel,
+  sellerLink,
+  sellerOutlineBtn,
+  sellerPrimaryBtn,
+  sellerSuccessBox,
+} from "@/components/vendor/sellerUi";
+import { getSellerHomeRoute } from "@/lib/sellerStatus";
+
+type LoginMode = "password" | "otp";
+const RESEND_SECONDS = 60; // same as the app
+
+const readStored = (key: string) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 export default function SellerLoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
+  const vendorState = useVendor();
   const isLoading = vendorState?.isLoading ?? false;
   const error = vendorState?.error ?? null;
-  const isAuthenticated = vendorState?.isAuthenticated ?? false;
+  const successMessage = vendorState?.successMessage ?? null;
   const vendorToken = vendorState?.vendorToken ?? null;
 
+  const [mode, setMode] = useState<LoginMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // If already logged in, redirect to dashboard
+  // Already signed in → go straight to the right place for this vendor's status
   useEffect(() => {
-    const token =
-      vendorToken ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem("bhansa_vendor_token")
-        : null);
-
+    const token = vendorToken || localStorage.getItem("bhansa_vendor_token");
     if (token) {
-      router.replace("/seller/dashboard");
+      router.replace(
+        getSellerHomeRoute(
+          vendorState?.vendorProfile || readStored("bhansa_vendor_profile"),
+          vendorState?.vendorUser || readStored("bhansa_vendor_user")
+        )
+      );
     }
-  }, [vendorToken, router]);
+  }, [vendorToken, vendorState?.vendorProfile, vendorState?.vendorUser, router]);
 
   useEffect(() => {
     dispatch(clearVendorAlerts());
   }, [dispatch]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // OTP resend countdown
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const id = setInterval(() => setResendTimer((t) => Math.max(0, t - 1)), 1000);
+    return () => clearInterval(id);
+  }, [resendTimer]);
+
+  const switchMode = (next: LoginMode) => {
+    setMode(next);
+    setLocalError(null);
+    setOtp("");
+    setOtpSent(false);
+    dispatch(clearVendorAlerts());
+  };
+
+  const goHome = (payload: VendorSessionResponse) => {
+    setEmail("");
+    setPassword("");
+    setOtp("");
+    router.replace(getSellerHomeRoute(payload?.vendor, payload?.user));
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    if (!email.trim()) return setLocalError("Please enter your registered vendor email address.");
+    if (!password) return setLocalError("Please enter your account password.");
 
-    if (!email.trim()) {
-      setLocalError("Please enter your registered vendor email address.");
-      return;
-    }
-    if (!password) {
-      setLocalError("Please enter your account password.");
-      return;
-    }
-
-    try {
-      const resultAction = await dispatch(
-        loginVendorPassword({ email: email.trim(), password })
-      );
-
-      if (loginVendorPassword.fulfilled.match(resultAction)) {
-        router.replace("/seller/dashboard");
-      }
-    } catch {
-      setLocalError("Failed to authenticate. Please check your credentials.");
+    const result = await dispatch(loginVendorPassword({ email: email.trim(), password }));
+    if (loginVendorPassword.fulfilled.match(result)) {
+      setEmail("");
+      setPassword("");
+      goHome(result.payload);
     }
   };
 
-  const handleFillDemo = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
+  const handleSendOtp = async () => {
     setLocalError(null);
+    if (!email.trim()) return setLocalError("Please enter your registered vendor email address.");
+    const result = await dispatch(sendVendorOtp(email.trim()));
+    if (sendVendorOtp.fulfilled.match(result)) {
+      setOtpSent(true);
+      setOtp("");
+      setResendTimer(RESEND_SECONDS);
+    }
   };
+
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    if (!otpSent) return handleSendOtp();
+    if (!/^\d{6}$/.test(otp)) return setLocalError("Enter the 6-digit code sent to your email.");
+
+    const result = await dispatch(verifyVendorOtp({ email: email.trim(), otp }));
+    if (verifyVendorOtp.fulfilled.match(result)) {
+      setEmail("");
+      setOtp("");
+      goHome(result.payload);
+    }
+  };
+
+  const shownError = localError || error;
+  const spinner = (
+    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-between font-sans text-gray-900">
-      {/* ── Top Header Navigation ── */}
-      <header className="h-18 bg-white border-b border-gray-100 flex items-center justify-between px-6 md:px-12">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#0C831F] to-[#25A53B] flex items-center justify-center text-white font-extrabold text-xl shadow-sm">
-            B
-          </div>
-          <div className="flex flex-col">
-            <span className="font-extrabold text-xl text-gray-900 tracking-tight leading-tight">
-              Bhansa<span className="text-[#0C831F]">Mart</span>
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
-              Seller Hub
-            </span>
-          </div>
-        </Link>
+    <SellerAuthShell>
+      <div className="mb-6">
+        <div className="hidden md:block mb-3">
+          <VendorPortalBadge />
+        </div>
+        <h1 className="text-2xl font-extrabold text-vendor-dark tracking-tight">Vendor Login</h1>
+        <p className="text-xs text-slate-500 mt-1">Manage your products, orders &amp; store catalog</p>
+      </div>
 
-        <Link
-          href="/"
-          className="text-xs md:text-sm font-semibold text-gray-600 hover:text-[#0C831F] flex items-center gap-1.5 transition-colors"
-        >
-          Customer Storefront
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </header>
+      {/* Login mode tabs — app: tabContainer / tabButtonActive */}
+      <div className="grid grid-cols-2 gap-1 p-1 mb-5 bg-slate-100 rounded-[10px]" role="tablist">
+        {(
+          [
+            ["password", "Password Login", Lock],
+            ["otp", "OTP Login", Smartphone],
+          ] as const
+        ).map(([key, label, Icon]) => {
+          const active = mode === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => switchMode(key)}
+              className={`h-10 rounded-lg flex items-center justify-center gap-1.5 text-[13px] transition-all cursor-pointer ${
+                active
+                  ? "bg-white text-vendor-dark font-bold shadow-sm"
+                  : "text-slate-500 font-semibold hover:text-slate-700"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* ── Main Form Section ── */}
-      <main className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-2">
-          {/* Left: Branding & Value Props */}
-          <div className="bg-gradient-to-br from-[#0C831F] via-[#09711A] to-[#065012] p-8 md:p-12 text-white flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-2xl" />
-            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-400/20 rounded-full blur-2xl" />
+      {shownError && (
+        <div className={`${sellerErrorBox} mb-4`}>
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <span className="font-medium">{shownError}</span>
+        </div>
+      )}
+      {!shownError && mode === "otp" && otpSent && successMessage && (
+        <div className={`${sellerSuccessBox} mb-4`}>
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <span className="font-medium">{successMessage}</span>
+        </div>
+      )}
 
-            <div className="relative z-10">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold tracking-wide text-white border border-white/20 mb-6">
-                <Store className="w-3.5 h-3.5" />
-                Merchant Portal
-              </span>
-              <h2 className="text-3xl font-extrabold leading-tight tracking-tight">
-                Grow Your Business with BhansaMart
-              </h2>
-              <p className="mt-3 text-sm text-green-50/90 leading-relaxed">
-                Manage orders, track inventory, view live settlements, and deliver fresh groceries to thousands of local customers in 15 minutes.
-              </p>
-            </div>
-
-            <div className="relative z-10 mt-8 space-y-4">
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10">
-                <Truck className="w-5 h-5 text-green-300 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-bold">Real-time Order Dispatch</p>
-                  <p className="text-green-100/80">Manage live orders with instant delivery boy assignment</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10">
-                <TrendingUp className="w-5 h-5 text-green-300 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-bold">Transparent Settlements</p>
-                  <p className="text-green-100/80">Automated COD collection, wallet balance & fast payouts</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10">
-                <Boxes className="w-5 h-5 text-green-300 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-bold">Smart Inventory Alerts</p>
-                  <p className="text-green-100/80">One-click stock toggles and low inventory notifications</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative z-10 mt-8 pt-6 border-t border-white/15 text-[11px] text-green-100/80 flex items-center justify-between">
-              <span>BhansaMart Verified Merchant Protection</span>
-              <ShieldCheck className="w-4 h-4 text-green-300" />
+      {mode === "password" ? (
+        <form onSubmit={handlePasswordLogin} className="space-y-4">
+          <div>
+            <label htmlFor="v-email" className={sellerLabel}>Vendor Email Address</label>
+            <div className="relative">
+              <Mail className={sellerInputIcon} />
+              <input
+                id="v-email"
+                type="email"
+                autoComplete="email"
+                placeholder="vendor@store.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={sellerInputWithIcon}
+              />
             </div>
           </div>
 
-          {/* Right: Vendor Login Form */}
-          <div className="p-8 md:p-12 flex flex-col justify-center">
-            <div className="mb-8">
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight">
-                Vendor Sign In
-              </h3>
-              <p className="text-xs text-gray-500 mt-1.5">
-                Access your store inventory, incoming orders and earnings
-              </p>
-            </div>
-
-            {/* Error Banner */}
-            {(localError || error) && (
-              <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-xs text-red-700 animate-fadeIn">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span className="font-medium">{localError || error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Email Input */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                  Vendor Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. store@bhansamart.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-sm pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:ring-2 focus:ring-green-100 focus:outline-none transition-all placeholder:text-gray-400"
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Password
-                  </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs font-semibold text-[#0C831F] hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-sm pl-10 pr-10 py-3 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:ring-2 focus:ring-green-100 focus:outline-none transition-all placeholder:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember Me */}
-              <div className="flex items-center justify-between text-xs">
-                <label className="flex items-center gap-2 cursor-pointer text-gray-600 select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 text-[#0C831F] rounded border-gray-300 focus:ring-[#0C831F] accent-[#0C831F]"
-                  />
-                  Keep me logged in
-                </label>
-              </div>
-
-              {/* Submit Button */}
+          <div>
+            <label htmlFor="v-pass" className={sellerLabel}>Password</label>
+            <div className="relative">
+              <Lock className={sellerInputIcon} />
+              <input
+                id="v-pass"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="Enter vendor password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${sellerInputWithIcon} pr-10`}
+              />
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3.5 px-4 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] active:bg-[#085C15] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                {isLoading ? (
+                {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Remember me + forgot — app: optionsRow */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setRememberMe((v) => !v)}
+              className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none"
+              aria-pressed={rememberMe}
+            >
+              <span
+                className={`w-4 h-4 rounded border-[1.5px] flex items-center justify-center ${
+                  rememberMe ? "bg-vendor-dark border-vendor-dark" : "bg-white border-slate-400"
+                }`}
+              >
+                {rememberMe && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+              </span>
+              Remember me
+            </button>
+            <button type="button" onClick={() => switchMode("otp")} className={sellerLink}>
+              Forgot password?
+            </button>
+          </div>
+
+          <button type="submit" disabled={isLoading} className={sellerPrimaryBtn}>
+            {isLoading ? spinner : "Login to Vendor Portal"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleOtpSubmit} className="space-y-4">
+          {!otpSent ? (
+            <div>
+              <label htmlFor="v-otp-email" className={sellerLabel}>Registered Vendor Email</label>
+              <div className="relative">
+                <Mail className={sellerInputIcon} />
+                <input
+                  id="v-otp-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="vendor@store.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={sellerInputWithIcon}
+                />
+              </div>
+              <p className={sellerHelper}>
+                We will send a 6-digit one-time code to your registered email.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* app: otpHeaderBox */}
+              <div className="text-center">
+                <p className="text-sm font-bold text-vendor-dark">Enter Verification Code</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  6-digit code sent to <span className="font-bold text-slate-800">{email}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtp("");
+                    dispatch(clearVendorAlerts());
+                  }}
+                  className={`${sellerLink} mt-1`}
+                >
+                  Change Email
+                </button>
+              </div>
+
+              <OtpInput value={otp} onChange={setOtp} disabled={isLoading} />
+
+              <div className="text-center text-xs text-slate-500">
+                {resendTimer > 0 ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Signing In...</span>
+                    Resend code in <span className="font-bold text-vendor-dark">{resendTimer}s</span>
                   </>
                 ) : (
-                  <>
-                    <span>Sign In to Seller Dashboard</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <button type="button" onClick={handleSendOtp} disabled={isLoading} className={sellerLink}>
+                    Resend OTP
+                  </button>
                 )}
-              </button>
-            </form>
-
-            {/* Quick Demo Credentials for Testing */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 text-center">
-                Test Vendor Account (Password: Password@123)
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleFillDemo("himalayan@gmail.com", "Password@123")}
-                  className="flex-1 py-2 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 transition-colors text-center cursor-pointer"
-                >
-                  Fill: himalayan@gmail.com
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleFillDemo("vikash@gmail.com", "Password@123")}
-                  className="flex-1 py-2 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 transition-colors text-center cursor-pointer"
-                >
-                  Fill: Annapurna Store
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      </main>
+            </>
+          )}
 
-      {/* ── Footer ── */}
-      <footer className="py-4 text-center text-xs text-gray-400 border-t border-gray-100 bg-white">
-        © 2026 BhansaMart Technologies Pvt. Ltd. All vendor rights reserved.
-      </footer>
-    </div>
+          <button type="submit" disabled={isLoading} className={sellerPrimaryBtn}>
+            {isLoading ? spinner : otpSent ? "Verify & Login" : "Send Login OTP"}
+          </button>
+        </form>
+      )}
+
+      {/* Divider + onboarding card — app: dividerRow / registerCard */}
+      <div className="flex items-center gap-2.5 my-6">
+        <span className="flex-1 h-px bg-slate-200" />
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Seller Community
+        </span>
+        <span className="flex-1 h-px bg-slate-200" />
+      </div>
+
+      <div className="rounded-xl bg-[#F8FAFC] border border-slate-200 p-4 text-center">
+        <p className="text-sm font-bold text-vendor-dark">Want to sell on BhansaMart?</p>
+        <p className="text-xs text-slate-500 mt-1 mb-3.5 leading-4">
+          Expand your grocery or restaurant business to thousands of customers.
+        </p>
+        <Link href="/seller/register" className={sellerOutlineBtn}>
+          <Store className="w-4.5 h-4.5" />
+          Start Seller Onboarding
+        </Link>
+      </div>
+
+    </SellerAuthShell>
   );
 }

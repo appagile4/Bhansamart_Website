@@ -42,7 +42,11 @@ export default function LoginPage() {
       return;
     }
 
-    dispatch(loginUser({ email: email.trim(), password }));
+    const result = await dispatch(loginUser({ email: email.trim(), password }));
+    if (loginUser.fulfilled.match(result)) {
+      setEmail("");
+      setPassword("");
+    }
   };
 
   return (

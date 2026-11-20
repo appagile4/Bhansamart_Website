@@ -12,6 +12,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Seller Hub palette — mirrors VendorColors in Bhansamart_frontend/src/constants/theme.ts */
+@theme {
+  --color-vendor: #016073;
+  --color-vendor-hover: #014c5c;
+  --color-vendor-dark: #003844;
+  --color-vendor-mid: #005b6e;
+  --color-vendor-teal: #008080;
+  --color-vendor-accent: #86c4cb;
+  --color-vendor-soft: #e6f4f6;
+  --color-vendor-100: #cce7ec;
+  --color-vendor-200: #a9d5dd;
+  --color-vendor-done: #059669;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -34,4 +48,13 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* Seller Hub notification banner */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[slideIn"] { animation: none !important; }
 }

@@ -1,480 +1,378 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Package,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  LayoutGrid,
-  List,
-  Eye,
-  Edit,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  RefreshCw,
-} from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorProducts,
-  toggleProductStock,
-  deleteVendorProduct,
-  VendorProduct,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useSearchParams } from "next/navigation";
+import { Filter, LayoutGrid, List, Package, PackagePlus,  RefreshCw, Search, X } from "lucide-react";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import type { SellerProduct } from "@/lib/seller/types";
+import { isLowStock, isOutOfStock, npr, productImage } from "@/lib/seller/format";
+import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
+import { EmptyState, ErrorBanner, LoadingBlock, PageHeader, btn, field, fieldLabel } from "@/components/vendor/ui";
 
-export default function VendorProductsPage() {
-  const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const products = vendorState?.products ?? [];
-  const productsTotal = vendorState?.productsTotal ?? 0;
-  const productsLoading = vendorState?.productsLoading ?? false;
+// app: SORT_OPTIONS + quick price chips
+const SORT_OPTIONS = [
+  { id: "default", label: "Default" },
+  { id: "price_asc", label: "Price: Low to High" },
+  { id: "price_desc", label: "Price: High to Low" },
+  { id: "alpha", label: "Alphabetic Order" },
+] as const;
+type SortId = (typeof SORT_OPTIONS)[number]["id"];
+const PRICE_CHIPS = [
+  { label: "Under 500", min: "", max: "500" },
+  { label: "500 – 1500", min: "500", max: "1500" },
+  { label: "Above 1500", min: "1500", max: "" },
+];
+type StockFilter = "all" | "in_stock" | "out_of_stock";
 
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [stockStatusFilter, setStockStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("default");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<LoadingBlock text="Loading products…" />}>
+      <ProductsView />
+    </Suspense>
+  );
+}
 
-  useEffect(() => {
-    dispatch(
-      fetchVendorProducts({
-        search: searchQuery,
-        category: categoryFilter,
-        stockStatus: stockStatusFilter,
-        sortBy,
-        page,
-        limit,
-      })
-    );
-  }, [dispatch, searchQuery, categoryFilter, stockStatusFilter, sortBy, page, limit]);
+function ProductsView() {
+  const params = useSearchParams();
+  const { data, error, loading, reload, setData } = useAsync(() => api.getMyProducts(), "products");
+  const products = useMemo(() => data?.products || [], [data]);
 
-  const handleToggleStock = (productId: string) => {
-    dispatch(toggleProductStock(productId));
-  };
+  const [search, setSearch] = useState(params.get("search") || "");
+  const [category, setCategory] = useState(params.get("category") || "All");
+  const [sort, setSort] = useState<SortId>("default");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [stock, setStock] = useState<StockFilter>("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleDeleteProduct = async (productId: string) => {
-    await dispatch(deleteVendorProduct(productId));
-    setDeleteConfirmId(null);
-  };
+  const categories = useMemo(() => {
+    const set = new Set<string>(MAIN_CATEGORY_NAMES);
+    products.forEach((p) => p.category && set.add(p.category));
+    return ["All", ...Array.from(set)];
+  }, [products]);
 
-  const getProductImage = (prod: VendorProduct) => {
-    if (prod.images && prod.images.length > 0) {
-      const first = prod.images[0];
-      return typeof first === "string" ? first : first.url;
+  const activeFilters = (stock !== "all" ? 1 : 0) + (minPrice || maxPrice ? 1 : 0);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const min = minPrice ? Number(minPrice) : null;
+    const max = maxPrice ? Number(maxPrice) : null;
+    const list = products.filter((p) => {
+      if (category !== "All" && p.category !== category) return false;
+      if (stock === "in_stock" && isOutOfStock(p)) return false;
+      if (stock === "out_of_stock" && !isOutOfStock(p)) return false;
+      if (min !== null && p.price < min) return false;
+      if (max !== null && p.price > max) return false;
+      if (!q) return true;
+      return [p.name, p.category, p.subCategory, p.sku, p.brand].some((f) => (f || "").toLowerCase().includes(q));
+    });
+    if (sort === "price_asc") list.sort((a, b) => a.price - b.price);
+    else if (sort === "price_desc") list.sort((a, b) => b.price - a.price);
+    else if (sort === "alpha") list.sort((a, b) => a.name.localeCompare(b.name));
+    return list;
+  }, [products, category, stock, minPrice, maxPrice, search, sort]);
+
+  const toggleAvailable = async (p: SellerProduct) => {
+    setToggling(p._id);
+    setActionError(null);
+    try {
+      const r = await api.toggleProductStock(p._id);
+      setData((prev) =>
+        prev
+          ? { ...prev, products: prev.products.map((x) => (x._id === p._id ? { ...x, inStock: r.inStock ?? !x.inStock, status: r.status ?? x.status } : x)) }
+          : prev
+      );
+    } catch (e) {
+      setActionError(api.errorText(e));
+    } finally {
+      setToggling(null);
     }
-    return "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop&q=80";
   };
 
-  const totalPages = Math.ceil(productsTotal / limit) || 1;
+  const resetFilters = () => {
+    setStock("all");
+    setMinPrice("");
+    setMaxPrice("");
+    setCategory("All");
+    setSearch("");
+  };
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Product Management</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Product List</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Product List
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="bg-gray-100 p-1 rounded-xl flex items-center gap-1 border border-gray-200">
-              <button
-                onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  viewMode === "table"
-                    ? "bg-white text-gray-900 shadow-2xs"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Table View"
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  viewMode === "grid"
-                    ? "bg-white text-gray-900 shadow-2xs"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Grid / Card View"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            </div>
-
-            <Link
-              href="/seller/dashboard/products/add"
-              className="px-4 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              Add Product
+    <>
+      <PageHeader
+        title="Product Management"
+        subtitle={`${data?.total ?? products.length} products in your catalogue`}
+        actions={
+          <>
+            <button type="button" onClick={reload} className={btn.outline} aria-label="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <Link href="/seller/dashboard/products/add" className={btn.primary}>
+              <PackagePlus className="w-4 h-4" /> Add Product
             </Link>
-          </div>
+          </>
+        }
+      />
+
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products, category, or SKU..."
+            aria-label="Search products"
+            className="w-full h-11 bg-white text-sm pl-10 pr-4 rounded-xl border border-slate-200 focus:border-vendor-dark focus:ring-2 focus:ring-vendor-100 focus:outline-none"
+          />
         </div>
 
-        {/* ── Filter & Search Toolbar ── */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search products by title, SKU, brand..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 focus:bg-white text-xs pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none transition-all placeholder:text-gray-400"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Category Filter */}
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-gray-50 text-xs font-medium text-gray-700 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
+        {/* Category chips */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {categories.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategory(c)}
+              aria-pressed={category === c}
+              className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-bold border cursor-pointer ${
+                category === c ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-200 text-slate-600 hover:border-vendor-dark"
+              }`}
             >
-              <option value="All">All Categories</option>
-              <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
-              <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-              <option value="Snacks & Munchies">Snacks & Munchies</option>
-              <option value="Cold Drinks & Juices">Cold Drinks & Juices</option>
-              <option value="Bakery & Biscuits">Bakery & Biscuits</option>
-              <option value="Tea, Coffee & More">Tea, Coffee & More</option>
-              <option value="Atta, Rice & Dal">Atta, Rice & Dal</option>
-            </select>
-
-            {/* Stock Status Filter */}
-            <select
-              value={stockStatusFilter}
-              onChange={(e) => setStockStatusFilter(e.target.value)}
-              className="bg-gray-50 text-xs font-medium text-gray-700 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-            >
-              <option value="all">All Stock</option>
-              <option value="in_stock">In Stock Only</option>
-              <option value="out_of_stock">Out of Stock</option>
-            </select>
-
-            {/* Sort Dropdown */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-gray-50 text-xs font-medium text-gray-700 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-            >
-              <option value="default">Sort By: Default</option>
-              <option value="price_asc">Price: Low to High</option>
-              <option value="price_desc">Price: High to Low</option>
-              <option value="alpha">Alphabetical (A-Z)</option>
-              <option value="newest">Newest First</option>
-            </select>
-          </div>
+              {c}
+            </button>
+          ))}
         </div>
 
-        {/* ── Table View ── */}
-        {viewMode === "table" ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Product</th>
-                    <th className="px-5 py-3.5">Category</th>
-                    <th className="px-5 py-3.5">Sub Category</th>
-                    <th className="px-5 py-3.5">Price</th>
-                    <th className="px-5 py-3.5">Stock</th>
-                    <th className="px-5 py-3.5">Rating</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {productsLoading && products.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-gray-400">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#0C831F]" />
-                        Loading products...
-                      </td>
-                    </tr>
-                  ) : products.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-12 text-center">
-                        <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                        <p className="font-semibold text-gray-600">No products found</p>
-                        <p className="text-gray-400 text-[11px] mt-0.5">
-                          Try adjusting your search or add a new product.
-                        </p>
-                        <Link
-                          href="/seller/dashboard/products/add"
-                          className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0C831F] text-white text-xs font-bold"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Add First Product
-                        </Link>
-                      </td>
-                    </tr>
-                  ) : (
-                    products.map((prod) => {
-                      const isInStock = prod.inStock ?? prod.stock > 0;
-                      return (
-                        <tr key={prod._id} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={getProductImage(prod)}
-                                alt={prod.name}
-                                className="w-12 h-12 rounded-xl object-cover border border-gray-100 bg-gray-50 shrink-0"
-                              />
-                              <div>
-                                <Link
-                                  href={`/seller/dashboard/products/${prod._id}`}
-                                  className="font-bold text-gray-900 hover:text-[#0C831F] transition-colors line-clamp-1"
-                                >
-                                  {prod.name}
-                                </Link>
-                                <span className="text-[11px] text-gray-400">
-                                  {prod.unit || "1 pack"} {prod.brand ? `• ${prod.brand}` : ""}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5 font-medium text-gray-700">
-                            {prod.category}
-                          </td>
-                          <td className="px-5 py-3.5 text-gray-500">
-                            {prod.subCategory || "General"}
-                          </td>
-                          <td className="px-5 py-3.5 font-black text-gray-900">
-                            ₹{prod.price}
-                            {prod.originalPrice && prod.originalPrice > prod.price && (
-                              <span className="text-[10px] text-gray-400 line-through block font-normal">
-                                ₹{prod.originalPrice}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span
-                              className={`font-bold ${
-                                prod.stock <= 5 ? "text-amber-600" : "text-gray-900"
-                              }`}
-                            >
-                              {prod.stock}
-                            </span>
-                            {prod.stock <= 5 && prod.stock > 0 && (
-                              <span className="block text-[10px] text-amber-600 font-semibold">
-                                Low Stock
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-1 font-bold text-gray-800">
-                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span>{prod.ratingsAverage ?? 4.8}</span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <button
-                              onClick={() => handleToggleStock(prod._id)}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-colors cursor-pointer ${
-                                isInStock
-                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                  : "bg-red-100 text-red-800 hover:bg-red-200"
-                              }`}
-                              title="Click to toggle in-stock / out-of-stock"
-                            >
-                              {isInStock ? (
-                                <>
-                                  <CheckCircle2 className="w-3 h-3" /> In Stock
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle className="w-3 h-3" /> Out of Stock
-                                </>
-                              )}
-                            </button>
-                          </td>
-                          <td className="px-5 py-3.5 text-right space-x-1">
-                            <Link
-                              href={`/seller/dashboard/products/${prod._id}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors inline-block"
-                              title="View Product Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                            <Link
-                              href={`/seller/dashboard/products/add?edit=${prod._id}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors inline-block"
-                              title="Edit Product"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                            <button
-                              onClick={() => setDeleteConfirmId(prod._id)}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                              title="Delete Product"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+        {/* Controls bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            Sort by
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} className={`${field} h-9 w-auto pr-8`}>
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setFilterOpen((o) => !o)} className={`${btn.outline} h-9 relative`} aria-expanded={filterOpen}>
+              <Filter className="w-4 h-4" /> Filter
+              {activeFilters > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{activeFilters}</span>
+              )}
+            </button>
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden" role="group" aria-label="View mode">
+              {(["grid", "list"] as const).map((m) => {
+                const Icon = m === "grid" ? LayoutGrid : List;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setView(m)}
+                    aria-pressed={view === m}
+                    aria-label={`${m} view`}
+                    className={`w-9 h-9 flex items-center justify-center cursor-pointer ${view === m ? "bg-vendor-dark text-white" : "bg-white text-slate-500"}`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                );
+              })}
             </div>
+          </div>
+        </div>
 
-            {/* Pagination Controls */}
-            <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-              <div>
-                Showing {(page - 1) * limit + 1} to{" "}
-                {Math.min(page * limit, productsTotal)} of {productsTotal} products
+        {/* Filter panel — app: FILTER MODAL */}
+        {filterOpen && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <span className={fieldLabel}>Availability</span>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "All Items"],
+                    ["in_stock", "In Stock Only"],
+                    ["out_of_stock", "Out of Stock"],
+                  ] as const
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setStock(k)}
+                    aria-pressed={stock === k}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer ${stock === k ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-200 text-slate-600"}`}
+                  >
+                    {l}
+                  </button>
+                ))}
               </div>
+            </div>
+            <div>
+              <span className={fieldLabel}>Price Range (NPR)</span>
               <div className="flex items-center gap-2">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="font-bold text-gray-800 px-2">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                <input className={field} inputMode="numeric" placeholder="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value.replace(/[^\d.]/g, ""))} aria-label="Minimum price" />
+                <span className="text-slate-400">–</span>
+                <input className={field} inputMode="numeric" placeholder="5000" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^\d.]/g, ""))} aria-label="Maximum price" />
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {PRICE_CHIPS.map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => {
+                      setMinPrice(c.min);
+                      setMaxPrice(c.max);
+                    }}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-bold border border-slate-200 text-slate-600 hover:border-vendor-dark cursor-pointer"
+                  >
+                    {c.label}
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-        ) : (
-          /* ── Grid / Card View (Screen 2 in Figma) ── */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {products.map((prod) => {
-              const isInStock = prod.inStock ?? prod.stock > 0;
-              return (
-                <div
-                  key={prod._id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all p-3 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-gray-50 mb-3 border border-gray-100">
-                      <img
-                        src={getProductImage(prod)}
-                        alt={prod.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        onClick={() => handleToggleStock(prod._id)}
-                        className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                          isInStock
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {isInStock ? "In Stock" : "Out"}
-                      </button>
-                    </div>
-
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {prod.category}
-                    </p>
-                    <Link
-                      href={`/seller/dashboard/products/${prod._id}`}
-                      className="text-xs font-bold text-gray-900 hover:text-[#0C831F] line-clamp-2 mt-0.5"
-                    >
-                      {prod.name}
-                    </Link>
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      {prod.unit || "1 pack"}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-black text-gray-900">
-                        ₹{prod.price}
-                      </span>
-                      {prod.originalPrice && prod.originalPrice > prod.price && (
-                        <span className="text-[10px] text-gray-400 line-through ml-1">
-                          ₹{prod.originalPrice}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Link
-                        href={`/seller/dashboard/products/add?edit=${prod._id}`}
-                        className="p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </Link>
-                      <button
-                        onClick={() => setDeleteConfirmId(prod._id)}
-                        className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            <div className="flex items-end justify-end">
+              <button type="button" onClick={resetFilters} className={btn.ghost}>
+                <X className="w-4 h-4" /> Reset All Filters
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ── Delete Confirmation Modal ── */}
-        {deleteConfirmId && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 text-center animate-scaleUp">
-              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-black text-gray-900">Delete Product?</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                This item will be removed from your catalog and will no longer appear to customers.
-              </p>
-              <div className="flex gap-2.5 mt-5">
-                <button
-                  onClick={() => setDeleteConfirmId(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDeleteProduct(deleteConfirmId)}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs cursor-pointer"
-                >
-                  Confirm Delete
-                </button>
-              </div>
-            </div>
+        {error && <ErrorBanner message={error} onRetry={reload} />}
+        {actionError && <ErrorBanner message={actionError} />}
+
+        {loading && !data ? (
+          <LoadingBlock text="Loading products…" />
+        ) : visible.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={Package}
+              title="No Products Found"
+              text={products.length ? "Try a different search or filter." : "Add your first product to start selling."}
+              action={
+                products.length ? (
+                  <button type="button" onClick={resetFilters} className={btn.outline}>
+                    Reset All Filters
+                  </button>
+                ) : (
+                  <Link href="/seller/dashboard/products/add" className={btn.primary}>
+                    <PackagePlus className="w-4 h-4" /> Add Product
+                  </Link>
+                )
+              }
+            />
+          </div>
+        ) : view === "grid" ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            {visible.map((p) => (
+              <ProductTile key={p._id} p={p} toggling={toggling === p._id} onToggle={() => toggleAvailable(p)} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
+            {visible.map((p) => (
+              <ProductRow key={p._id} p={p} toggling={toggling === p._id} onToggle={() => toggleAvailable(p)} />
+            ))}
           </div>
         )}
       </div>
-    </VendorLayout>
+    </>
+  );
+}
+
+function StockLabel({ p }: { p: SellerProduct }) {
+  if (isOutOfStock(p)) return <span className="text-[10px] font-bold text-red-600">Out of stock</span>;
+  if (isLowStock(p)) return <span className="text-[10px] font-bold text-amber-600">Low · {p.stock} left</span>;
+  return <span className="text-[10px] font-semibold text-slate-500">{p.stock} in stock</span>;
+}
+
+function AvailableSwitch({ p, toggling, onToggle }: { p: SellerProduct; toggling: boolean; onToggle: () => void }) {
+  const on = p.inStock !== false;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={toggling}
+      role="switch"
+      aria-checked={on}
+      aria-label={`${p.name} available`}
+      className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer disabled:opacity-60"
+    >
+      <span className={`relative w-9 h-5 rounded-full transition-colors ${on ? "bg-vendor-done" : "bg-slate-300"}`}>
+        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? "left-4.5" : "left-0.5"}`} />
+      </span>
+      Available
+    </button>
+  );
+}
+
+function Thumb({ p, className }: { p: SellerProduct; className: string }) {
+  const src = productImage(p);
+  return (
+    <span className={`bg-slate-50 overflow-hidden flex items-center justify-center ${className}`}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <Package className="w-8 h-8 text-slate-300" />
+      )}
+    </span>
+  );
+}
+
+function ProductTile({ p, toggling, onToggle }: { p: SellerProduct; toggling: boolean; onToggle: () => void }) {
+  return (
+    <article className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+      <Link href={`/seller/dashboard/products/${p._id}`} className="block">
+        <Thumb p={p} className="w-full aspect-square" />
+      </Link>
+      <div className="p-3 flex-1 flex flex-col gap-1">
+        <Link href={`/seller/dashboard/products/${p._id}`} className="text-sm font-bold text-slate-900 line-clamp-2 hover:text-vendor-dark">
+          {p.name}
+        </Link>
+        <p className="text-[11px] text-slate-500 truncate">
+          {p.category}
+          {p.unit ? ` · ${p.unit}` : ""}
+        </p>
+        <p className="text-sm">
+          <span className="font-extrabold text-slate-900">{npr(p.price)}</span>
+          {!!p.originalPrice && p.originalPrice > p.price && <span className="ml-1.5 text-xs text-slate-400 line-through">{npr(p.originalPrice)}</span>}
+        </p>
+        <StockLabel p={p} />
+        <div className="mt-auto pt-2 flex items-center justify-between">
+          <AvailableSwitch p={p} toggling={toggling} onToggle={onToggle} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ProductRow({ p, toggling, onToggle }: { p: SellerProduct; toggling: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center gap-4 p-3 md:p-4">
+      <Link href={`/seller/dashboard/products/${p._id}`}>
+        <Thumb p={p} className="w-16 h-16 rounded-xl shrink-0" />
+      </Link>
+      <div className="flex-1 min-w-0">
+        <Link href={`/seller/dashboard/products/${p._id}`} className="text-sm font-bold text-slate-900 hover:text-vendor-dark line-clamp-1">
+          {p.name}
+        </Link>
+        <p className="text-[11px] text-slate-500 truncate">
+          {p.category} {p.sku ? `· SKU ${p.sku}` : ""}
+        </p>
+        <StockLabel p={p} />
+      </div>
+      <div className="text-right hidden sm:block">
+        <p className="text-sm font-extrabold text-slate-900">{npr(p.price)}</p>
+        {!!p.originalPrice && p.originalPrice > p.price && <p className="text-xs text-slate-400 line-through">{npr(p.originalPrice)}</p>}
+      </div>
+      <AvailableSwitch p={p} toggling={toggling} onToggle={onToggle} />
+    </div>
   );
 }

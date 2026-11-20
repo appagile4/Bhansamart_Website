@@ -1,491 +1,295 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import {
-  Boxes,
-  Search,
-  Filter,
-  Download,
-  Plus,
-  Edit,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Truck,
-  FileText,
-  DollarSign,
-  X,
-  RefreshCw,
-} from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorProducts,
-  toggleProductStock,
-  VendorProduct,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, Boxes, CheckCircle2, Minus, Package, PackagePlus, Pencil, Plus, RefreshCw, Search, XCircle } from "lucide-react";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import type { SellerProduct } from "@/lib/seller/types";
+import { isLowStock, isOutOfStock, npr, productImage } from "@/lib/seller/format";
+import { EmptyState, ErrorBanner, LoadingBlock, Modal, PageHeader, StatCard, btn, field, fieldLabel } from "@/components/vendor/ui";
 
-interface SupplierItem {
-  id: string;
-  name: string;
-  contactPerson: string;
-  phone: string;
-  itemSupplied: string;
-  leadTime: string;
-}
+const FILTERS = ["all", "in_stock", "low_stock", "out_of_stock"] as const;
+type FilterKey = (typeof FILTERS)[number];
 
-interface PurchaseItem {
-  id: string;
-  purchaseId: string;
-  supplierName: string;
-  date: string;
-  totalAmount: number;
-  totalPaid: number;
-  balance: number;
-  status: "Delivered" | "Pending";
-}
-
-const DEFAULT_SUPPLIERS: SupplierItem[] = [
-  {
-    id: "s1",
-    name: "Fresh Farm Produce Co.",
-    contactPerson: "Rajiv Koirala",
-    phone: "+977-9801234567",
-    itemSupplied: "Fruits, Vegetables & Greens",
-    leadTime: "1-2 Days",
-  },
-  {
-    id: "s2",
-    name: "Himalayan Dairy Distributors",
-    contactPerson: "Bikram Thapa",
-    phone: "+977-9812345678",
-    itemSupplied: "Milk, Butter, Paneer, Curd",
-    leadTime: "Daily (6 AM)",
-  },
-  {
-    id: "s3",
-    name: "Metro FMCG Wholesalers",
-    contactPerson: "Sunil Shrestha",
-    phone: "+977-9823456789",
-    itemSupplied: "Snacks, Biscuits, Beverages",
-    leadTime: "2-3 Days",
-  },
-  {
-    id: "s4",
-    name: "Annapurna Grains & Pulses",
-    contactPerson: "Mohan Agrawal",
-    phone: "+977-9834567890",
-    itemSupplied: "Atta, Basmati Rice, Dals",
-    leadTime: "3 Days",
-  },
-];
-
-const DEFAULT_PURCHASES: PurchaseItem[] = [
-  {
-    id: "p1",
-    purchaseId: "#PO-2026-081",
-    supplierName: "Fresh Farm Produce Co.",
-    date: "2026-11-08",
-    totalAmount: 18500,
-    totalPaid: 18500,
-    balance: 0,
-    status: "Delivered",
-  },
-  {
-    id: "p2",
-    purchaseId: "#PO-2026-079",
-    supplierName: "Himalayan Dairy Distributors",
-    date: "2026-11-09",
-    totalAmount: 9400,
-    totalPaid: 9400,
-    balance: 0,
-    status: "Delivered",
-  },
-  {
-    id: "p3",
-    purchaseId: "#PO-2026-075",
-    supplierName: "Metro FMCG Wholesalers",
-    date: "2026-11-05",
-    totalAmount: 32000,
-    totalPaid: 25000,
-    balance: 7000,
-    status: "Pending",
-  },
-];
-
-function VendorInventoryContent() {
-  const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") || "overview";
-
-  const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const products = vendorState?.products ?? [];
-  const productsLoading = vendorState?.productsLoading ?? false;
-
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [suppliers, setSuppliers] = useState<SupplierItem[]>(DEFAULT_SUPPLIERS);
-  const [purchases, setPurchases] = useState<PurchaseItem[]>(DEFAULT_PURCHASES);
-
-  // Quick edit stock modal
-  const [editingProduct, setEditingProduct] = useState<VendorProduct | null>(null);
-  const [newStockQty, setNewStockQty] = useState("");
-
-  useEffect(() => {
-    dispatch(fetchVendorProducts({}));
-  }, [dispatch]);
-
-  const handleUpdateStock = async () => {
-    if (!editingProduct) return;
-    const qty = parseInt(newStockQty, 10);
-    if (isNaN(qty) || qty < 0) return;
-
-    try {
-      const token = localStorage.getItem("bhansa_vendor_token");
-      await fetch(`/api/products/${editingProduct._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ stock: qty, inStock: qty > 0 }),
-      });
-      dispatch(fetchVendorProducts({}));
-      setEditingProduct(null);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const getProductImage = (prod: VendorProduct) => {
-    if (prod.images && prod.images.length > 0) {
-      const first = prod.images[0];
-      return typeof first === "string" ? first : first.url;
-    }
-    return "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80";
-  };
-
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={<LoadingBlock text="Loading inventory…" />}>
+      <InventoryView />
+    </Suspense>
   );
+}
+
+function InventoryView() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const raw = params.get("filter");
+  const filter: FilterKey = FILTERS.includes(raw as FilterKey) ? (raw as FilterKey) : "all";
+  const setFilter = (f: FilterKey) => router.replace(f === "all" ? "/seller/dashboard/inventory" : `/seller/dashboard/inventory?filter=${f}`);
+
+  const { data, error, loading, reload, setData } = useAsync(() => api.getMyProducts(), "products");
+  const products = useMemo(() => data?.products || [], [data]);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<SellerProduct | null>(null);
+
+  const kpi = useMemo(
+    () => ({
+      total: products.length,
+      in: products.filter((p) => !isOutOfStock(p) && !isLowStock(p)).length,
+      low: products.filter(isLowStock).length,
+      out: products.filter(isOutOfStock).length,
+    }),
+    [products]
+  );
+  const categories = useMemo(() => ["All", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))], [products]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return products.filter((p) => {
+      if (filter === "low_stock" && !isLowStock(p)) return false;
+      if (filter === "out_of_stock" && !isOutOfStock(p)) return false;
+      if (filter === "in_stock" && (isOutOfStock(p) || isLowStock(p))) return false;
+      if (category !== "All" && p.category !== category) return false;
+      return !q || [p.name, p.sku, p.category].some((f) => (f || "").toLowerCase().includes(q));
+    });
+  }, [products, filter, category, search]);
+
+  const patchLocal = (id: string, patch: Partial<SellerProduct>) =>
+    setData((prev) => (prev ? { ...prev, products: prev.products.map((p) => (p._id === id ? { ...p, ...patch } : p)) } : prev));
+
+  const saveStock = async (p: SellerProduct, stock: number, reorderLevel?: number) => {
+    setBusyId(p._id);
+    setActionError(null);
+    const patch = { stock, inStock: stock > 0, ...(reorderLevel !== undefined ? { reorderLevel } : {}) };
+    try {
+      await api.updateProduct(p._id, patch);
+      patchLocal(p._id, patch);
+      return true;
+    } catch (e) {
+      setActionError(api.errorText(e));
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggle = async (p: SellerProduct) => {
+    setBusyId(p._id);
+    setActionError(null);
+    try {
+      const r = await api.toggleProductStock(p._id);
+      patchLocal(p._id, { inStock: r.inStock, status: r.status ?? p.status });
+    } catch (e) {
+      setActionError(api.errorText(e));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Inventory Management</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">
-                {activeTab === "overview"
-                  ? "Stock Overview"
-                  : activeTab === "suppliers"
-                  ? "Supplier List"
-                  : "Purchase History"}
-              </span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Inventory & Supply Chain
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5"
-            >
-              <Download className="w-4 h-4 text-gray-500" />
-              Export Statement
+    <>
+      <PageHeader
+        title="Stock & Inventory Overview"
+        subtitle="Keep stock levels accurate so customers never order unavailable items."
+        actions={
+          <>
+            <button type="button" onClick={reload} className={btn.outline} aria-label="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
-          </div>
-        </div>
+            <Link href="/seller/dashboard/products/add" className={btn.primary}>
+              <PackagePlus className="w-4 h-4" /> Add Product
+            </Link>
+          </>
+        }
+      />
 
-        {/* ── Tabs (Matching Figma Inventory Screens) ── */}
-        <div className="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-1 no-scrollbar">
-          {[
-            { id: "overview", label: "Stock Overview" },
-            { id: "suppliers", label: "Supplier List" },
-            { id: "purchases", label: "Purchase History" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === tab.id
-                  ? "bg-[#0C831F] text-white shadow-xs"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-              }`}
-            >
-              {tab.label}
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {(
+            [
+              ["all", "Total Items", kpi.total, Boxes, "teal"],
+              ["in_stock", "In Stock", kpi.in, CheckCircle2, "green"],
+              ["low_stock", "Low Stock", kpi.low, AlertTriangle, "amber"],
+              ["out_of_stock", "Out of Stock", kpi.out, XCircle, "red"],
+            ] as const
+          ).map(([key, label, value, Icon, tone]) => (
+            <button key={key} type="button" onClick={() => setFilter(key)} className={`text-left rounded-2xl cursor-pointer ${filter === key ? "ring-2 ring-vendor-dark" : ""}`} aria-pressed={filter === key}>
+              <StatCard label={label} value={value} icon={Icon} tone={tone} />
             </button>
           ))}
         </div>
 
-        {/* ── Search Toolbar ── */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search items, suppliers, SKU..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 focus:bg-white text-xs pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none transition-all placeholder:text-gray-400"
-            />
-          </div>
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by product name, SKU, or category..."
+            aria-label="Search inventory"
+            className="w-full h-11 bg-white text-sm pl-10 pr-4 rounded-xl border border-slate-200 focus:border-vendor-dark focus:ring-2 focus:ring-vendor-100 focus:outline-none"
+          />
         </div>
 
-        {/* ── TAB 1: Stock Overview (Matching Screen 1 in Figma) ── */}
-        {activeTab === "overview" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Product</th>
-                    <th className="px-5 py-3.5">Supplier</th>
-                    <th className="px-5 py-3.5">Stock Qty</th>
-                    <th className="px-5 py-3.5">Reorder Point</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {filteredProducts.map((prod) => {
-                    const isLow = prod.stock <= (prod.reorderLevel ?? 5) && prod.stock > 0;
-                    const isOut = prod.stock === 0 || !prod.inStock;
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {categories.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategory(c)}
+              aria-pressed={category === c}
+              className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-bold border cursor-pointer ${category === c ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-200 text-slate-600"}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
 
-                    return (
-                      <tr key={prod._id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={getProductImage(prod)}
-                              alt={prod.name}
-                              className="w-10 h-10 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
-                            />
-                            <div>
-                              <p className="font-bold text-gray-900 line-clamp-1">
-                                {prod.name}
-                              </p>
-                              <span className="text-[10px] text-gray-400">
-                                {prod.category}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 font-medium text-gray-600">
-                          {prod.supplierName || "Fresh Farms Dist."}
-                        </td>
-                        <td className="px-5 py-3.5 font-black text-gray-900 text-sm">
-                          {prod.stock}
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-500 font-semibold">
-                          {prod.reorderLevel ?? 5}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {isOut ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-red-100 text-red-800">
-                              <XCircle className="w-3 h-3" /> Out of Stock
-                            </span>
-                          ) : isLow ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800">
-                              <AlertTriangle className="w-3 h-3" /> Low Stock
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-green-100 text-green-800">
-                              <CheckCircle2 className="w-3 h-3" /> In Stock
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-right space-x-1">
-                          <button
-                            onClick={() => {
-                              setEditingProduct(prod);
-                              setNewStockQty(String(prod.stock));
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            Adjust Qty
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+        {error && <ErrorBanner message={error} onRetry={reload} />}
+        {actionError && <ErrorBanner message={actionError} />}
+
+        {loading && !data ? (
+          <LoadingBlock text="Loading inventory…" />
+        ) : visible.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={Boxes}
+              title="No Stock Items Found"
+              action={
+                <Link href="/seller/dashboard/products/add" className={btn.primary}>
+                  Add New Product
+                </Link>
+              }
+            />
           </div>
-        )}
-
-        {/* ── TAB 2: Supplier List (Matching Screen 2 in Figma) ── */}
-        {activeTab === "suppliers" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Supplier Name</th>
-                    <th className="px-5 py-3.5">Contact Person</th>
-                    <th className="px-5 py-3.5">Phone</th>
-                    <th className="px-5 py-3.5">Items Supplied</th>
-                    <th className="px-5 py-3.5">Lead Time</th>
-                    <th className="px-5 py-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {suppliers.map((sup) => (
-                    <tr key={sup.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="px-5 py-3.5 font-bold text-gray-900">
-                        {sup.name}
-                      </td>
-                      <td className="px-5 py-3.5 font-medium">{sup.contactPerson}</td>
-                      <td className="px-5 py-3.5 text-gray-500">{sup.phone}</td>
-                      <td className="px-5 py-3.5 text-gray-700">{sup.itemSupplied}</td>
-                      <td className="px-5 py-3.5 font-semibold text-[#0C831F]">
-                        {sup.leadTime}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <button className="text-xs font-bold text-[#0C831F] hover:underline">
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── TAB 3: Purchase History (Matching Screen 3 in Figma) ── */}
-        {activeTab === "purchases" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Purchase ID</th>
-                    <th className="px-5 py-3.5">Supplier Name</th>
-                    <th className="px-5 py-3.5">Purchase Date</th>
-                    <th className="px-5 py-3.5">Total Amount</th>
-                    <th className="px-5 py-3.5">Total Paid</th>
-                    <th className="px-5 py-3.5">Balance</th>
-                    <th className="px-5 py-3.5">Delivery Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {purchases.map((po) => (
-                    <tr key={po.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="px-5 py-3.5 font-bold text-gray-900">
-                        {po.purchaseId}
-                      </td>
-                      <td className="px-5 py-3.5 font-medium">{po.supplierName}</td>
-                      <td className="px-5 py-3.5 text-gray-500">{po.date}</td>
-                      <td className="px-5 py-3.5 font-black text-gray-900">
-                        ₹{po.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5 text-green-700 font-bold">
-                        ₹{po.totalPaid.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5 text-red-600 font-bold">
-                        ₹{po.balance.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                            po.status === "Delivered"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {po.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── Adjust Qty Modal ── */}
-        {editingProduct && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 animate-scaleUp">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                <h3 className="text-base font-black text-gray-900">
-                  Adjust Inventory Stock
-                </h3>
-                <button
-                  onClick={() => setEditingProduct(null)}
-                  className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="my-4">
-                <p className="text-xs font-bold text-gray-900 line-clamp-1">
-                  {editingProduct.name}
-                </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Current Available Stock: {editingProduct.stock}
-                </p>
-
-                <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    New Stock Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newStockQty}
-                    onChange={(e) => setNewStockQty(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-sm font-bold px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                  />
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
+            {visible.map((p) => {
+              const out = isOutOfStock(p);
+              const low = isLowStock(p);
+              const busy = busyId === p._id;
+              const img = productImage(p);
+              return (
+                <div key={p._id} className="p-3 md:p-4 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4">
+                  <span className="w-14 h-14 rounded-xl bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                    {img ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="w-6 h-6 text-slate-300" />
+                    )}
+                  </span>
+                  <div className="flex-1 min-w-[10rem]">
+                    <Link href={`/seller/dashboard/products/${p._id}`} className="text-sm font-bold text-slate-900 hover:text-vendor-dark line-clamp-1">
+                      {p.name}
+                    </Link>
+                    <p className="text-[11px] text-slate-500">
+                      {npr(p.price)} · SKU {p.sku || "—"} · reorder at {p.reorderLevel || 5}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                      out ? "bg-red-50 text-red-700 border-red-200" : low ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    }`}
+                  >
+                    {out ? "Out of Stock" : low ? "Low Stock" : "In Stock"}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" disabled={busy || p.stock <= 0} onClick={() => saveStock(p, Math.max(0, p.stock - 1))} className="w-8 h-8 rounded-lg border border-slate-300 flex items-center justify-center cursor-pointer disabled:opacity-40" aria-label={`Decrease ${p.name} stock`}>
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-12 text-center text-sm font-extrabold text-slate-900">{p.stock}</span>
+                    <button type="button" disabled={busy} onClick={() => saveStock(p, p.stock + 1)} className="w-8 h-8 rounded-lg border border-slate-300 flex items-center justify-center cursor-pointer disabled:opacity-40" aria-label={`Increase ${p.name} stock`}>
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <button type="button" role="switch" aria-checked={p.inStock !== false} aria-label={`${p.name} active`} disabled={busy} onClick={() => toggle(p)} className="cursor-pointer disabled:opacity-60">
+                    <span className={`relative block w-9 h-5 rounded-full transition-colors ${p.inStock !== false ? "bg-vendor-done" : "bg-slate-300"}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${p.inStock !== false ? "left-4.5" : "left-0.5"}`} />
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => setEditing(p)} className="p-2 rounded-lg text-slate-500 hover:text-vendor-dark hover:bg-vendor-soft cursor-pointer" aria-label={`Adjust ${p.name} stock`}>
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  onClick={() => setEditingProduct(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateStock}
-                  className="flex-1 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs"
-                >
-                  Save Stock
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
-    </VendorLayout>
+
+      {editing && (
+        <AdjustStockModal
+          key={editing._id}
+          product={editing}
+          busy={busyId === editing._id}
+          onClose={() => setEditing(null)}
+          onSave={async (stock, reorder) => {
+            if (await saveStock(editing, stock, reorder)) setEditing(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 
-export default function VendorInventoryPage() {
+function AdjustStockModal({
+  product,
+  busy,
+  onClose,
+  onSave,
+}: {
+  product: SellerProduct;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (stock: number, reorder: number) => void;
+}) {
+  const [stock, setStock] = useState(String(product.stock));
+  const [reorder, setReorder] = useState(String(product.reorderLevel || 5));
+  const [error, setError] = useState<string | null>(null);
+
+  const save = () => {
+    const s = parseInt(stock, 10);
+    const r = parseInt(reorder, 10);
+    if (isNaN(s) || s < 0) return setError("Enter a valid stock quantity.");
+    onSave(s, isNaN(r) ? 5 : r);
+  };
+
   return (
-    <Suspense
-      fallback={
-        <div className="p-12 text-center text-gray-400">Loading inventory...</div>
+    <Modal
+      open
+      title="Adjust Stock Level"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={btn.ghost}>
+            Cancel
+          </button>
+          <button type="button" disabled={busy} onClick={save} className={btn.primary}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+        </>
       }
     >
-      <VendorInventoryContent />
-    </Suspense>
+      <div className="space-y-4">
+        <p className="text-sm font-bold text-slate-900">{product.name}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className={fieldLabel}>Stock quantity</span>
+            <input className={field} inputMode="numeric" value={stock} onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Low-stock alert at</span>
+            <input className={field} inputMode="numeric" value={reorder} onChange={(e) => setReorder(e.target.value.replace(/\D/g, ""))} />
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">Setting stock to 0 marks the product unavailable.</p>
+        {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+      </div>
+    </Modal>
   );
 }

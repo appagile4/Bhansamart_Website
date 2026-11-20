@@ -1,173 +1,192 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  PieChart,
-  TrendingUp,
-  CircleDollarSign,
-  Download,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ShieldCheck,
-  FileSpreadsheet,
-} from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorStats,
-  fetchVendorTransactions,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, BadgeCheck, Bike, Clock4, HandCoins, Plus, RefreshCw, Wallet } from "lucide-react";
+import { useAppDispatch } from "@/redux/hooks";
+import { useVendor } from "@/lib/seller/useVendor";
+import { fetchCodSummary, fetchVendorStats } from "@/redux/slices/vendorSlice";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import { formatDateTime, npr } from "@/lib/seller/format";
+import TransactionList from "@/components/vendor/TransactionList";
+import WithdrawModal from "@/components/vendor/WithdrawModal";
+import { Card, EmptyState, ErrorBanner, LoadingBlock, PageHeader, StatCard, SuccessBanner, Tabs, btn } from "@/components/vendor/ui";
 
-export default function VendorFinancePage() {
+const TABS = [
+  { key: "overview", label: "Overview" },
+  { key: "withdrawals", label: "Withdrawals" },
+  { key: "settlements", label: "Settlements" },
+  { key: "delivery", label: "Delivery Boy Cash" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+export default function FinancePage() {
+  return (
+    <Suspense fallback={<LoadingBlock text="Loading finance…" />}>
+      <FinanceView />
+    </Suspense>
+  );
+}
+
+function FinanceView() {
+  const router = useRouter();
+  const params = useSearchParams();
   const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const stats = vendorState?.stats ?? null;
-  const transactions = vendorState?.transactions ?? [];
+  const cod = useVendor().codSummary;
+  const raw = params.get("tab");
+  const tab: TabKey = TABS.some((t) => t.key === raw) ? (raw as TabKey) : "overview";
 
-  useEffect(() => {
+  const { data, error, loading, reload } = useAsync(() => api.getTransactions({ limit: 100 }), "finance");
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const wallet = data?.wallet;
+  const txns = useMemo(() => data?.transactions || [], [data]);
+  const withdrawals = useMemo(() => txns.filter((t) => t.type.startsWith("WITHDRAWAL")), [txns]);
+  const settlements = useMemo(() => txns.filter((t) => t.type === "ORDER_EARNING" && t.status === "SETTLED"), [txns]);
+  const pendingPayouts = withdrawals.filter((t) => ["PENDING", "SUBMITTED"].includes(t.status)).reduce((n, t) => n + Math.abs(t.amount), 0);
+  const completedPayouts = withdrawals.filter((t) => ["COMPLETED", "SETTLED"].includes(t.status)).reduce((n, t) => n + Math.abs(t.amount), 0);
+
+  const refresh = () => {
+    reload();
+    dispatch(fetchCodSummary());
     dispatch(fetchVendorStats());
-    dispatch(fetchVendorTransactions());
-  }, [dispatch]);
-
-  const totalSales = stats?.totalSales ?? 0;
-  const totalEarned = stats?.totalEarned ?? 0;
-  const commissionPaid = Math.max(0, totalSales - totalEarned);
-  const pendingSettlement = stats?.pendingSettlement ?? 0;
+  };
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Accounting</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Finance & Expense</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Financial Breakdown & Earnings
-            </h1>
-          </div>
+    <>
+      <PageHeader
+        title="Finance & Expense"
+        subtitle="Payouts, settlements & rider cash"
+        actions={
+          <>
+            <button type="button" onClick={refresh} className={btn.outline} aria-label="Refresh">
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button type="button" onClick={() => setWithdrawOpen(true)} className={btn.primary} disabled={!wallet?.withdrawableBalance}>
+              <Wallet className="w-4 h-4" /> Withdraw
+            </button>
+          </>
+        }
+      />
 
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            <Download className="w-4 h-4 text-gray-500" />
-            Download P&L Statement
-          </button>
-        </div>
+      <div className="space-y-4">
+        {notice && <SuccessBanner message={notice} />}
+        {error && <ErrorBanner message={error} onRetry={reload} />}
 
-        {/* ── 4 Finance Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Gross Merchandise Value (GMV)
-            </span>
-            <p className="text-2xl font-black text-gray-900 mt-2">
-              ₹{totalSales.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Total customer order value</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Net Merchant Earnings
-            </span>
-            <p className="text-2xl font-black text-[#0C831F] mt-2">
-              ₹{totalEarned.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Credited to vendor wallet</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Platform & Tech Fee
-            </span>
-            <p className="text-2xl font-black text-gray-700 mt-2">
-              ₹{commissionPaid.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Transparent 5-10% slab</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Pending Clearing
-            </span>
-            <p className="text-2xl font-black text-purple-600 mt-2">
-              ₹{pendingSettlement.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Clearing on delivery</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <section className="lg:col-span-1 rounded-2xl bg-gradient-to-br from-vendor-dark to-vendor text-white p-5 flex flex-col justify-between gap-4">
+            <div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-bold">
+                <BadgeCheck className="w-3.5 h-3.5 text-vendor-accent" /> Ready for Payout
+              </span>
+              <p className="text-xs text-white/70 mt-3">Available Balance</p>
+              <p className="text-3xl font-extrabold">{npr(wallet?.withdrawableBalance)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWithdrawOpen(true)}
+              disabled={!wallet?.withdrawableBalance}
+              className="h-10 rounded-lg bg-white text-vendor-dark font-extrabold text-sm hover:bg-vendor-soft cursor-pointer disabled:opacity-60"
+            >
+              Request Withdrawal
+            </button>
+          </section>
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard label="Settled Lifetime" value={npr(wallet?.totalEarned)} sub="Total credited" icon={BadgeCheck} tone="green" />
+            <StatCard label="Pending Settlement" value={npr(wallet?.pendingSettlement)} sub="In processing window" icon={Clock4} tone="amber" />
+            <StatCard label="COD with Riders" value={npr(wallet?.codCashWithDeliveryBoys)} sub="Accept cash handover →" icon={HandCoins} tone="violet" href="/seller/dashboard/cod-handover" />
           </div>
         </div>
 
-        {/* ── Deductions & Settlement Ledger ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-              Settlement Ledger & Commission Breakdown
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Itemized statement of all order disbursements and deductions.
-            </p>
-          </div>
+        <Tabs tabs={TABS} active={tab} onChange={(k) => router.replace(k === "overview" ? "/seller/dashboard/finance" : `/seller/dashboard/finance?tab=${k}`)} />
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                <tr>
-                  <th className="px-5 py-3.5">Reference ID</th>
-                  <th className="px-5 py-3.5">Transaction Type</th>
-                  <th className="px-5 py-3.5">Gross Order Value</th>
-                  <th className="px-5 py-3.5">Platform Commission</th>
-                  <th className="px-5 py-3.5">Net Payout</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5 text-right">Settled Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-gray-400">
-                      No settled transactions recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx._id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="px-5 py-3.5 font-bold text-gray-900">
-                        {tx._id.slice(-8)}
-                      </td>
-                      <td className="px-5 py-3.5 font-medium">{tx.type}</td>
-                      <td className="px-5 py-3.5">₹{tx.grossAmount || tx.amount}</td>
-                      <td className="px-5 py-3.5 text-red-600 font-semibold">
-                        -₹{tx.commission || 0}
-                      </td>
-                      <td className="px-5 py-3.5 font-black text-gray-900">
-                        ₹{tx.netAmount || tx.amount}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-[#0C831F]">
-                          {tx.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-gray-400">
-                        {new Date(tx.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {loading && !data ? (
+          <LoadingBlock text="Loading finance…" />
+        ) : tab === "overview" ? (
+          <Card title="Recent Financial Records" action={<Link href="/seller/dashboard/transactions" className="text-xs font-bold text-vendor-teal hover:underline">All transactions</Link>}>
+            <TransactionList items={txns.slice(0, 15)} />
+          </Card>
+        ) : tab === "withdrawals" ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Pending Payouts" value={npr(pendingPayouts)} tone="amber" icon={Clock4} />
+              <StatCard label="Completed Payouts" value={npr(completedPayouts)} tone="green" icon={BadgeCheck} />
+            </div>
+            <Card
+              title="Withdrawal History"
+              action={
+                <button type="button" onClick={() => setWithdrawOpen(true)} className="text-xs font-bold text-vendor-teal hover:underline inline-flex items-center gap-1 cursor-pointer">
+                  <Plus className="w-3.5 h-3.5" /> New Request
+                </button>
+              }
+            >
+              <TransactionList items={withdrawals} emptyTitle="No Withdrawal Requests" />
+            </Card>
           </div>
-        </div>
+        ) : tab === "settlements" ? (
+          <Card title="Settled Store Earnings">
+            <TransactionList items={settlements} emptyTitle="No Settled Orders Yet" />
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <Card
+              title="Cash held by delivery partners"
+              action={
+                <Link href="/seller/dashboard/cod-handover" className="text-xs font-bold text-vendor-teal hover:underline inline-flex items-center gap-1">
+                  Accept Cash Handover <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              }
+            >
+              {!cod ? (
+                <LoadingBlock />
+              ) : cod.ridersDue.length === 0 ? (
+                <EmptyState icon={Bike} title="All Clear!" text="No rider is holding COD cash for your store." />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {cod.ridersDue.map((r) => (
+                    <li key={r.deliveryBoy._id} className="px-5 py-3 flex items-center justify-between gap-3 text-sm">
+                      <span>
+                        <span className="font-bold text-slate-900">{r.deliveryBoy.fullName}</span>
+                        <span className="text-xs text-slate-500"> · {r.ordersCount} order(s)</span>
+                      </span>
+                      <span className="font-extrabold text-violet-700">{npr(r.totalDue)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card title="Recent Handover Receipts">
+              {!cod?.recentHandovers.length ? (
+                <EmptyState icon={HandCoins} title="No handovers yet" />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {cod.recentHandovers.map((h) => (
+                    <li key={h._id} className="px-5 py-3 flex items-center justify-between gap-3 text-xs">
+                      <span>
+                        <span className="font-bold text-slate-900">#{h.receiptNumber}</span> · {h.deliveryBoy?.fullName} · {formatDateTime(h.createdAt)}
+                      </span>
+                      <span className="font-extrabold text-emerald-700">{npr(h.amountSubmitted)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        )}
       </div>
-    </VendorLayout>
+
+      <WithdrawModal
+        open={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        available={wallet?.withdrawableBalance || 0}
+        onDone={(m) => {
+          setNotice(m);
+          refresh();
+        }}
+      />
+    </>
   );
 }

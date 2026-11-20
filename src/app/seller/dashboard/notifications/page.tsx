@@ -1,138 +1,124 @@
 "use client";
 
-import React, { useEffect } from "react";
-import Link from "next/link";
-import {
-  Bell,
-  CheckCircle2,
-  Clock,
-  ShoppingCart,
-  AlertCircle,
-  Truck,
-  Check,
-} from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorNotifications,
-  markVendorNotificationRead,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, CheckCheck, HandCoins, RefreshCw, ShoppingBag, Wallet, XCircle } from "lucide-react";
+import { useAppDispatch } from "@/redux/hooks";
+import { useVendor } from "@/lib/seller/useVendor";
+import { fetchVendorNotifications, markAllVendorNotificationsRead, markVendorNotificationRead } from "@/redux/slices/vendorSlice";
+import type { SellerNotification } from "@/lib/seller/types";
+import { formatDateTime, timeAgo } from "@/lib/seller/format";
+import { notificationHref } from "@/components/vendor/VendorHeader";
+import { Card, EmptyState, PageHeader, Tabs, btn } from "@/components/vendor/ui";
 
-export default function VendorNotificationsPage() {
+const FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "UNREAD", label: "Unread" },
+  { key: "ORDERS", label: "Orders" },
+  { key: "FINANCE", label: "Finance" },
+] as const;
+type FilterKey = (typeof FILTERS)[number]["key"];
+
+const isFinance = (t: string) => t.includes("COD") || t.includes("WITHDRAWAL") || t.includes("PAYMENT");
+
+const iconFor = (n: SellerNotification) => {
+  const t = n.type || "";
+  if (t.includes("CANCEL")) return { Icon: XCircle, cls: "bg-red-50 text-red-600" };
+  if (t.includes("COD")) return { Icon: HandCoins, cls: "bg-violet-50 text-violet-600" };
+  if (isFinance(t)) return { Icon: Wallet, cls: "bg-emerald-50 text-emerald-600" };
+  if (t.includes("ORDER")) return { Icon: ShoppingBag, cls: "bg-blue-50 text-blue-600" };
+  return { Icon: Bell, cls: "bg-vendor-soft text-vendor" };
+};
+
+export default function NotificationsPage() {
+  const router = useRouter();
   const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const notifications = vendorState?.notifications ?? [];
-  const unreadNotificationsCount = vendorState?.unreadNotificationsCount ?? 0;
+  const { notifications, unreadNotificationsCount } = useVendor();
+  const [filter, setFilter] = useState<FilterKey>("ALL");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    dispatch(fetchVendorNotifications());
-  }, [dispatch]);
+  const visible = useMemo(
+    () =>
+      notifications.filter((n) => {
+        const t = n.type || "";
+        if (filter === "UNREAD") return !n.isRead;
+        if (filter === "ORDERS") return t.includes("ORDER");
+        if (filter === "FINANCE") return isFinance(t);
+        return true;
+      }),
+    [notifications, filter]
+  );
 
-  const handleMarkAllRead = async () => {
-    try {
-      const token = localStorage.getItem("bhansa_vendor_token");
-      await fetch("/api/vendor/notifications/read-all", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      dispatch(fetchVendorNotifications());
-    } catch {
-      // ignore
-    }
+  const open = (n: SellerNotification) => {
+    if (!n.isRead) dispatch(markVendorNotificationRead(n._id));
+    router.push(notificationHref(n));
   };
 
-  const handleMarkSingleRead = (id: string) => {
-    dispatch(markVendorNotificationRead(id));
+  const refresh = async () => {
+    setRefreshing(true);
+    await dispatch(fetchVendorNotifications());
+    setRefreshing(false);
   };
 
   return (
-    <VendorLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Alerts</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Notifications</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-              Store Notifications
-              {unreadNotificationsCount > 0 && (
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">
-                  {unreadNotificationsCount} unread
-                </span>
-              )}
-            </h1>
-          </div>
-
-          {unreadNotificationsCount > 0 && (
-            <button
-              onClick={handleMarkAllRead}
-              className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Check className="w-4 h-4 text-[#0C831F]" />
-              Mark All as Read
+    <>
+      <PageHeader
+        title="Inbox & Activity"
+        subtitle={unreadNotificationsCount ? `${unreadNotificationsCount} unread` : "You're all caught up"}
+        actions={
+          <>
+            <button type="button" onClick={refresh} className={btn.outline} aria-label="Refresh">
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
             </button>
-          )}
-        </div>
-
-        {/* ── Notifications List ── */}
-        <div className="space-y-3">
-          {notifications.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-xs">
-              <Bell className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="font-bold text-gray-700 text-sm">No notifications yet</p>
-              <p className="text-xs text-gray-400 mt-1">
-                You will be notified here whenever new customer orders arrive or cash handovers are recorded.
-              </p>
-            </div>
+            <button type="button" onClick={() => dispatch(markAllVendorNotificationsRead())} disabled={!unreadNotificationsCount} className={btn.primary}>
+              <CheckCheck className="w-4 h-4" /> Mark all as read
+            </button>
+          </>
+        }
+      />
+      <div className="space-y-4">
+        <Tabs
+          tabs={FILTERS}
+          active={filter}
+          onChange={setFilter}
+          counts={{
+            ALL: notifications.length,
+            UNREAD: notifications.filter((n) => !n.isRead).length,
+            ORDERS: notifications.filter((n) => (n.type || "").includes("ORDER")).length,
+            FINANCE: notifications.filter((n) => isFinance(n.type || "")).length,
+          }}
+        />
+        <Card>
+          {visible.length === 0 ? (
+            <EmptyState icon={Bell} title="No Notifications" text="Order, payment and COD updates for your store will show up here." />
           ) : (
-            notifications.map((n) => (
-              <div
-                key={n._id}
-                onClick={() => handleMarkSingleRead(n._id)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-4 ${
-                  !n.isRead
-                    ? "bg-white border-green-200 shadow-xs ring-1 ring-green-100"
-                    : "bg-white/80 border-gray-100 hover:bg-white"
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    !n.isRead
-                      ? "bg-green-50 text-[#0C831F]"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  <Bell className="w-5 h-5" />
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
-                      {n.title}
-                    </h3>
-                    <span className="text-[10px] text-gray-400">
-                      {new Date(n.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                    {n.message}
-                  </p>
-                </div>
-              </div>
-            ))
+            <ul className="divide-y divide-slate-100">
+              {visible.map((n) => {
+                const { Icon, cls } = iconFor(n);
+                return (
+                  <li key={n._id}>
+                    <button type="button" onClick={() => open(n)} className={`w-full text-left px-5 py-4 flex gap-3 hover:bg-slate-50 cursor-pointer ${!n.isRead ? "bg-vendor-soft/40" : ""}`}>
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cls}`}>
+                        <Icon className="w-5 h-5" />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center justify-between gap-3">
+                          <span className={`text-sm truncate ${n.isRead ? "font-semibold text-slate-700" : "font-extrabold text-slate-900"}`}>{n.title}</span>
+                          <span className="text-[11px] text-slate-400 shrink-0" title={formatDateTime(n.createdAt)}>
+                            {timeAgo(n.createdAt)}
+                          </span>
+                        </span>
+                        <span className="block text-xs text-slate-600 mt-0.5">{n.message}</span>
+                      </span>
+                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-vendor mt-2 shrink-0" aria-label="Unread" />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </div>
+        </Card>
       </div>
-    </VendorLayout>
+    </>
   );
 }

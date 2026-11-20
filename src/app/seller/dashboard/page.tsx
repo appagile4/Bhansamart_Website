@@ -1,437 +1,359 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
-  TrendingUp,
-  Package,
-  ShoppingCart,
-  CircleDollarSign,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Truck,
   ArrowUpRight,
+  BadgeCheck,
+  Banknote,
+  Check,
+  CheckCheck,
+  Clock,
+  HandCoins,
+  Inbox,
+  Loader2,
+  MapPin,
+  Minus,
+  Package,
+  Play,
   Plus,
-  RefreshCw,
-  Boxes,
-  Star,
-  ChevronRight,
-  AlertTriangle,
+  Power,
+  QrCode,
+  ShoppingBag,
+  Truck,
+  Wallet,
+  XCircle,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorStats,
-  fetchVendorOrders,
-  fetchVendorProducts,
-  updateVendorOrderStatus,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useAppDispatch } from "@/redux/hooks";
+import { useVendor } from "@/lib/seller/useVendor";
+import { updateDeliveryRadius, updateStoreStatus } from "@/redux/slices/vendorSlice";
+import { notificationHref } from "@/components/vendor/VendorHeader";
 
-export default function VendorDashboardOverview() {
+/*
+ * Mirrors the app's VendorMain/dashboard.tsx: same sections in the same order, same wording and
+ * the same colours (taken from that screen's StyleSheet), laid out full-width for the web.
+ */
+const RADIUS_PRESETS = [1, 3, 5, 8, 10, 15, 20]; // app: preset radius chips
+const nprNum = (n?: number | null) => `NPR ${(n || 0).toLocaleString()}`;
+
+// app: recent order status pill colours (default #F1F5F9 / #475569)
+const statusPill = (s?: string) =>
+  s === "DELIVERED"
+    ? "bg-[#ECFDF5] text-[#059669]"
+    : s === "PLACED"
+      ? "bg-[#EFF6FF] text-[#1D4ED8]"
+      : s === "CANCELLED"
+        ? "bg-[#FEF2F2] text-[#DC2626]"
+        : "bg-[#F1F5F9] text-[#475569]";
+
+export default function SellerDashboardPage() {
   const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const stats = vendorState?.stats ?? null;
-  const statsLoading = vendorState?.statsLoading ?? false;
-  const orders = vendorState?.orders ?? [];
-  const ordersLoading = vendorState?.ordersLoading ?? false;
-  const products = vendorState?.products ?? [];
-  const vendorUser = vendorState?.vendorUser ?? null;
-  const vendorProfile = vendorState?.vendorProfile ?? null;
-  const isStoreOpen = vendorState?.isStoreOpen ?? true;
+  const v = useVendor();
+  const m = v.stats?.metrics;
+  const loc = v.vendorProfile?.shippingLocations;
+  const open = v.isStoreOpen;
+  const pending = m?.pendingOrders ?? v.pendingCount ?? 0;
+  const recentOrders = (v.stats?.recentOrders?.length ? v.stats.recentOrders : v.orders.slice(0, 5)).filter(Boolean);
+  const notifications = (v.notifications.length ? v.notifications : v.stats?.recentNotifications || []).filter(Boolean);
+  const unread = v.unreadNotificationsCount || 0;
 
-  const [filterPeriod, setFilterPeriod] = useState<"today" | "week" | "month">("today");
+  const [toggling, setToggling] = useState(false);
+  const [radiusSaving, setRadiusSaving] = useState(false);
+  const [radiusMsg, setRadiusMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  useEffect(() => {
-    dispatch(fetchVendorStats());
-    dispatch(fetchVendorOrders({ limit: 10 }));
-    dispatch(fetchVendorProducts({ limit: 5 }));
-  }, [dispatch]);
-
-  const handleRefresh = () => {
-    dispatch(fetchVendorStats());
-    dispatch(fetchVendorOrders({ limit: 10 }));
+  const toggleStore = async () => {
+    setToggling(true);
+    await dispatch(updateStoreStatus(!open));
+    setToggling(false);
   };
 
-  const handleQuickStatusUpdate = async (orderId: string, nextStatus: string) => {
-    await dispatch(updateVendorOrderStatus({ orderId, status: nextStatus }));
-    dispatch(fetchVendorStats());
+  const setRadius = async (km: number) => {
+    if (km === v.deliveryRadiusKm || km < 1 || km > 50) return;
+    setRadiusSaving(true);
+    setRadiusMsg(null);
+    const r = await dispatch(updateDeliveryRadius(km));
+    setRadiusSaving(false);
+    if (updateDeliveryRadius.rejected.match(r)) setRadiusMsg({ ok: false, text: (r.payload as string) || "Failed to update delivery radius" });
+    else setRadiusMsg({ ok: true, text: `Your store delivery radius is now set to ${km} km. Nearby customer product availability has updated in real-time.` });
   };
 
-  // Recent 5 orders
-  const recentOrders = orders.slice(0, 5);
-
-  const totalSales = stats?.totalSales ?? 0;
-  const availableBal = stats?.availableWithdrawalBalance ?? 0;
-  const pendingOrders = stats?.pendingOrders ?? 0;
-  const completedOrders = stats?.completedOrders ?? 0;
-  const totalOrders = stats?.totalOrders ?? 0;
-  const storeRating = stats?.storeRating ?? 4.8;
+  const orderLink = (status?: string) => (status ? `/seller/dashboard/orders?status=${status}` : "/seller/dashboard/orders");
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Top Welcome & Action Bar ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-              Welcome back, {vendorUser?.name || "Vendor"}!
-              <span className="text-xl">👋</span>
-            </h1>
-            <p className="text-xs text-gray-500 mt-1">
-              Store:{" "}
-              <span className="font-semibold text-gray-800">
-                {vendorProfile?.businessDetails?.businessName ||
-                  vendorProfile?.storeName ||
-                  "BhansaMart Express Hub"}
-              </span>{" "}
-              • Status:{" "}
-              <span
-                className={`font-bold ${
-                  isStoreOpen ? "text-[#0C831F]" : "text-red-500"
-                }`}
-              >
-                {isStoreOpen ? "Open & Delivering" : "Temporarily Closed"}
-              </span>
-            </p>
+    <div className="space-y-5 text-[#0F172A]">
+      {/* ── Store status toggle bar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-[#F1F5F9] rounded-xl px-4 py-2.5">
+        <span className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${open ? "bg-[#10B981]" : "bg-[#EF4444]"}`} />
+          <span className="text-sm font-semibold text-[#475569]">{open ? "Store is Open & Accepting Orders" : "Store is Currently Closed"}</span>
+        </span>
+        <button
+          type="button"
+          onClick={toggleStore}
+          disabled={toggling}
+          aria-pressed={open}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer disabled:opacity-70 ${
+            open ? "bg-[#E6F4EA] text-[#10B981]" : "bg-[#FEE2E2] text-[#EF4444]"
+          }`}
+        >
+          {toggling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : open ? <Power className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          {open ? "Close Store" : "Open Store"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {/* ── Delivery coverage radius ── */}
+        <section className="bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-4 md:p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="w-[38px] h-[38px] rounded-full bg-[#E6F4EA] flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 text-[#016073]" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-bold text-[#0F172A]">Delivery Coverage Radius</h2>
+              <p className="text-xs text-[#64748B]">Only customers within this radius can order</p>
+            </div>
+            <span className="px-2.5 py-1 rounded-xl bg-[#016073] text-white text-xs font-bold">{v.deliveryRadiusKm} km</span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center gap-8">
             <button
-              onClick={handleRefresh}
-              className="p-2.5 rounded-xl border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
-              title="Refresh Stats"
+              type="button"
+              aria-label="Decrease radius"
+              disabled={radiusSaving || v.deliveryRadiusKm <= 1}
+              onClick={() => setRadius(v.deliveryRadiusKm - 1)}
+              className="w-[38px] h-[38px] rounded-full bg-[#F1F5F9] border border-[#CBD5E1] flex items-center justify-center text-[#016073] cursor-pointer disabled:opacity-40"
             >
-              <RefreshCw
-                className={`w-4 h-4 ${statsLoading ? "animate-spin text-[#0C831F]" : ""}`}
-              />
+              <Minus className="w-4 h-4" />
             </button>
-
-            <Link
-              href="/seller/dashboard/products/add"
-              className="px-4 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            <div className="text-center">
+              <p className="text-2xl font-extrabold text-[#016073]">{v.deliveryRadiusKm} km</p>
+              <p className="text-[11px] font-semibold text-[#64748B]">{radiusSaving ? "Saving…" : "Active Radius"}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="Increase radius"
+              disabled={radiusSaving || v.deliveryRadiusKm >= 50}
+              onClick={() => setRadius(v.deliveryRadiusKm + 1)}
+              className="w-[38px] h-[38px] rounded-full bg-[#F1F5F9] border border-[#CBD5E1] flex items-center justify-center text-[#016073] cursor-pointer disabled:opacity-40"
             >
               <Plus className="w-4 h-4" />
-              Add Product
-            </Link>
-          </div>
-        </div>
-
-        {/* ── 4 Main Metric Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 1. Total Revenue */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Total Revenue
-              </span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#0C831F] flex items-center justify-center">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <span className="text-2xl font-black text-gray-900">
-                ₹{totalSales.toLocaleString()}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="text-[#0C831F] font-bold flex items-center">
-                <ArrowUpRight className="w-3.5 h-3.5" /> +12.5%
-              </span>
-              <span>vs previous month</span>
-            </div>
+            </button>
           </div>
 
-          {/* 2. Total Orders */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Total Orders
-              </span>
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <span className="text-2xl font-black text-gray-900">
-                {totalOrders}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="text-[#0C831F] font-bold">{completedOrders}</span>
-              <span>Delivered successfully</span>
-            </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {RADIUS_PRESETS.map((r) => {
+              const on = v.deliveryRadiusKm === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  disabled={radiusSaving}
+                  onClick={() => setRadius(r)}
+                  aria-pressed={on}
+                  className={`px-3 py-1.5 rounded-2xl border text-xs cursor-pointer ${on ? "bg-[#016073] border-[#016073] text-white font-bold" : "bg-[#F8FAFC] border-[#E2E8F0] text-[#475569] font-semibold"}`}
+                >
+                  {r} km
+                </button>
+              );
+            })}
           </div>
 
-          {/* 3. Available Balance */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Wallet Balance
+          {radiusMsg && <p className={`text-xs font-medium ${radiusMsg.ok ? "text-[#059669]" : "text-[#DC2626]"}`} role="status">{radiusMsg.text}</p>}
+
+          <div className="flex items-center gap-2 rounded-lg bg-[#F8FAFC] border border-[#F1F5F9] px-3 py-2">
+            <MapPin className="w-3.5 h-3.5 text-[#64748B] shrink-0" />
+            <p className="text-xs text-[#475569] truncate">
+              {loc?.warehouseAddress || "Kathmandu Store Hub"}
+              {" • "}
+              {loc?.latitude != null && loc?.longitude != null ? `${Number(loc.latitude).toFixed(4)}°N, ${Number(loc.longitude).toFixed(4)}°E` : "Store coordinates not set"}
+            </p>
+          </div>
+        </section>
+
+        {/* ── Welcome gradient banner + financial highlights ── */}
+        <div className="space-y-4">
+          <section className="rounded-[14px] p-5 md:p-6 text-white bg-[linear-gradient(135deg,#016073_0%,#005566_50%,#00687D_100%)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-extrabold tracking-[1px] text-[#86C4CB]">SELLERHUB DASHBOARD</p>
+                <h1 className="text-xl md:text-2xl font-extrabold text-white mt-1">Welcome, {v.vendorUser?.name || "Partner"}</h1>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 text-xs font-bold text-white shrink-0">
+                <BadgeCheck className="w-3.5 h-3.5 text-[#86C4CB]" /> Active Seller
               </span>
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <CircleDollarSign className="w-5 h-5" />
-              </div>
             </div>
-            <div className="mt-3 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-gray-900">
-                ₹{availableBal.toLocaleString()}
+            <p className="mt-3 text-sm text-[#E2E8F0]">Track real-time orders, monitor COD cash submissions and manage bank payouts.</p>
+          </section>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link href="/seller/dashboard/transactions" className="block rounded-xl border bg-[#F0FDF4] border-[#BBF7D0] p-4 hover:brightness-[0.98]">
+              <span className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#15803D]">Withdrawable Balance</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#15803D]" />
               </span>
-              <Link
-                href="/seller/dashboard/transactions"
-                className="text-[11px] font-bold text-[#0C831F] hover:underline"
-              >
-                Withdraw
-              </Link>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              Pending payout: ₹{(stats?.pendingSettlement ?? 0).toLocaleString()}
-            </div>
-          </div>
-
-          {/* 4. Store Rating */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Customer Rating
+              <span className="block mt-1.5 text-xl font-extrabold text-[#15803D]">{nprNum(m?.availableWithdrawalBalance)}</span>
+              <span className="block text-[11px] text-[#16A34A]">Settled & ready for bank payout</span>
+            </Link>
+            <Link href="/seller/dashboard/cod-handover" className="block rounded-xl border bg-[#FEF9C3] border-[#FDE047] p-4 hover:brightness-[0.98]">
+              <span className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#854D0E]">COD Cash with Riders</span>
+                <HandCoins className="w-4 h-4 text-[#854D0E]" />
               </span>
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
-                <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-2xl font-black text-gray-900">
-                {storeRating.toFixed(1)}
-              </span>
-              <span className="text-xs text-gray-400 font-medium">/ 5.0</span>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              Based on verified customer reviews
-            </div>
-          </div>
-        </div>
-
-        {/* ── Order Status Flow Pills ── */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-              Order Pipeline Overview
-            </h2>
-            <Link
-              href="/seller/dashboard/orders"
-              className="text-xs font-bold text-[#0C831F] hover:underline flex items-center gap-1"
-            >
-              View All Orders <ChevronRight className="w-3.5 h-3.5" />
+              <span className="block mt-1.5 text-xl font-extrabold text-[#854D0E]">{nprNum(m?.codCashWithDeliveryBoys)}</span>
+              <span className="block text-[11px] text-[#A16207]">Tap to verify & confirm handover</span>
             </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {/* New / Pending */}
-            <Link
-              href="/seller/dashboard/orders?tab=pending"
-              className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/60 hover:bg-amber-100/60 transition-colors"
-            >
-              <div className="flex items-center justify-between text-amber-800">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span className="text-lg font-black">{pendingOrders}</span>
-              </div>
-              <p className="text-xs font-bold text-amber-900 mt-2">New Orders</p>
-              <p className="text-[10px] text-amber-700">Requires acceptance</p>
-            </Link>
-
-            {/* Preparing */}
-            <Link
-              href="/seller/dashboard/orders?tab=preparing"
-              className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/60 hover:bg-blue-100/60 transition-colors"
-            >
-              <div className="flex items-center justify-between text-blue-800">
-                <Boxes className="w-4 h-4 text-blue-600" />
-                <span className="text-lg font-black">{stats?.processingOrders ?? 0}</span>
-              </div>
-              <p className="text-xs font-bold text-blue-900 mt-2">Preparing</p>
-              <p className="text-[10px] text-blue-700">Packing items</p>
-            </Link>
-
-            {/* Ready for Pickup */}
-            <Link
-              href="/seller/dashboard/orders?tab=ready"
-              className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/60 hover:bg-purple-100/60 transition-colors"
-            >
-              <div className="flex items-center justify-between text-purple-800">
-                <Truck className="w-4 h-4 text-purple-600" />
-                <span className="text-lg font-black">
-                  {orders.filter((o) => o.orderStatus === "READY_FOR_PICKUP").length}
-                </span>
-              </div>
-              <p className="text-xs font-bold text-purple-900 mt-2">Ready / Dispatch</p>
-              <p className="text-[10px] text-purple-700">Waiting rider pickup</p>
-            </Link>
-
-            {/* Completed */}
-            <Link
-              href="/seller/dashboard/orders?tab=completed"
-              className="p-3.5 rounded-xl bg-green-50/70 border border-green-200/60 hover:bg-green-100/60 transition-colors"
-            >
-              <div className="flex items-center justify-between text-green-800">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-                <span className="text-lg font-black">{completedOrders}</span>
-              </div>
-              <p className="text-xs font-bold text-green-900 mt-2">Completed</p>
-              <p className="text-[10px] text-green-700">Delivered to door</p>
-            </Link>
-
-            {/* Cancelled */}
-            <Link
-              href="/seller/dashboard/orders?tab=cancelled"
-              className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center justify-between text-gray-700">
-                <XCircle className="w-4 h-4 text-gray-500" />
-                <span className="text-lg font-black">{stats?.cancelledOrders ?? 0}</span>
-              </div>
-              <p className="text-xs font-bold text-gray-800 mt-2">Cancelled</p>
-              <p className="text-[10px] text-gray-500">Refunded / Rejected</p>
-            </Link>
-          </div>
-        </div>
-
-        {/* ── Recent Live Orders Table (Matching Figma Orders Screen) ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-extrabold text-gray-900">
-                Incoming & Live Orders
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Orders requiring verification and store preparation
-              </p>
-            </div>
-            <Link
-              href="/seller/dashboard/orders"
-              className="text-xs font-bold text-[#0C831F] hover:underline flex items-center gap-1"
-            >
-              See All Orders <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                <tr>
-                  <th className="px-5 py-3.5">Order ID</th>
-                  <th className="px-5 py-3.5">Customer</th>
-                  <th className="px-5 py-3.5">Items</th>
-                  <th className="px-5 py-3.5">Total Amount</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Created At</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {ordersLoading && orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                      Loading live orders...
-                    </td>
-                  </tr>
-                ) : recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center">
-                      <ShoppingCart className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="font-semibold text-gray-600">No active orders right now</p>
-                      <p className="text-gray-400 text-[11px] mt-0.5">
-                        New orders will appear here automatically in real time.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  recentOrders.map((order) => {
-                    const status = order.orderStatus || "PLACED";
-                    return (
-                      <tr key={order._id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-5 py-3.5 font-bold text-gray-900">
-                          {order.orderNumber || order._id.slice(-8)}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <p className="font-semibold text-gray-900">
-                            {order.user?.name || "Customer"}
-                          </p>
-                          <p className="text-gray-400 text-[11px]">
-                            {order.deliveryAddress?.city || "Local"}
-                          </p>
-                        </td>
-                        <td className="px-5 py-3.5 font-medium">
-                          {order.items?.length || 0} item(s)
-                        </td>
-                        <td className="px-5 py-3.5 font-bold text-gray-900">
-                          ₹{order.totalAmount}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                              status === "PLACED"
-                                ? "bg-amber-100 text-amber-800"
-                                : status === "ACCEPTED" || status === "PREPARING"
-                                ? "bg-blue-100 text-blue-800"
-                                : status === "READY_FOR_PICKUP"
-                                ? "bg-purple-100 text-purple-800"
-                                : status === "DELIVERED"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-500">
-                          {new Date(order.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </td>
-                        <td className="px-5 py-3.5 text-right space-x-1.5">
-                          {status === "PLACED" && (
-                            <button
-                              onClick={() => handleQuickStatusUpdate(order._id, "ACCEPTED")}
-                              className="px-2.5 py-1 rounded-lg bg-[#0C831F] hover:bg-[#0A701A] text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
-                            >
-                              Accept
-                            </button>
-                          )}
-                          {status === "ACCEPTED" && (
-                            <button
-                              onClick={() => handleQuickStatusUpdate(order._id, "PREPARING")}
-                              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                            >
-                              Prepare
-                            </button>
-                          )}
-                          {status === "PREPARING" && (
-                            <button
-                              onClick={() =>
-                                handleQuickStatusUpdate(order._id, "READY_FOR_PICKUP")
-                              }
-                              className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                            >
-                              Ready
-                            </button>
-                          )}
-                          <Link
-                            href={`/seller/dashboard/orders?verify=${order._id}`}
-                            className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 text-[11px] font-semibold transition-colors inline-block"
-                          >
-                            Verify
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
-    </VendorLayout>
+
+      {/* ── Live operations overview ── */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-base font-extrabold text-[#0F172A]">Live Operations Overview</h2>
+          {v.statsLoading && <Loader2 className="w-4 h-4 animate-spin text-[#016073]" />}
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
+          <Metric icon={Banknote} iconBg="#ECFDF5" iconColor="#059669" value={nprNum(m?.totalSales)} label="Total Delivered Sales" />
+          <Metric icon={ShoppingBag} iconBg="#EFF6FF" iconColor="#2563EB" value={`${m?.totalOrders ?? 0} Orders`} label="Lifetime Orders" />
+          <Metric
+            icon={Clock}
+            iconBg="#FFFBEB"
+            iconColor="#D97706"
+            value={`${pending} Pending`}
+            valueColor="#D97706"
+            label="Needs Acceptance"
+            href={orderLink("pending")}
+            highlight={pending > 0}
+          />
+          <Metric icon={Truck} iconBg="#F5F3FF" iconColor="#7C3AED" value={`${m?.processingOrders ?? 0} Active`} label="Preparing / Dispatched" href={orderLink("preparing")} />
+          <Metric icon={CheckCheck} iconBg="#ECFDF5" iconColor="#10B981" value={`${m?.completedOrders ?? 0} Delivered`} label="Successfully Handed Over" href={orderLink("completed")} />
+          <Metric icon={XCircle} iconBg="#FEF2F2" iconColor="#EF4444" value={`${m?.cancelledOrders ?? 0} Cancelled`} label="Declined / Cancelled" href={orderLink("cancelled")} />
+        </div>
+      </section>
+
+      {/* ── Store management shortcuts ── */}
+      <section>
+        <h2 className="text-base font-extrabold text-[#0F172A] mb-3">Store Management Shortcuts</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Shortcut href="/seller/dashboard/orders" icon={Truck} label={`Live Orders${pending > 0 ? ` (${pending})` : ""}`} />
+          <Shortcut href="/seller/dashboard/cod-handover" icon={HandCoins} label="COD Handover" cod />
+          <Shortcut href="/seller/dashboard/payment-qr" icon={QrCode} label="Payment QR" />
+          <Shortcut href="/seller/dashboard/transactions?withdraw=1" icon={Wallet} label="Withdraw" />
+        </div>
+      </section>
+
+      <div className={`grid grid-cols-1 gap-5 ${notifications.length ? "xl:grid-cols-[3fr_2fr]" : ""}`}>
+        {/* ── Recent customer orders ── */}
+        <section className="bg-white border border-[#F1F5F9] rounded-[14px] shadow-sm">
+          <div className="flex items-center justify-between px-4 md:px-5 py-3.5">
+            <h2 className="text-[15px] font-extrabold text-[#0F172A]">Recent Customer Orders</h2>
+            <Link href="/seller/dashboard/orders" className="text-xs font-bold text-[#016073] hover:underline">View All</Link>
+          </div>
+          {recentOrders.length === 0 ? (
+            <div className="py-7 flex flex-col items-center">
+              <Inbox className="w-7 h-7 text-[#CBD5E1]" />
+              <p className="text-[13px] text-[#94A3B8] mt-1.5">No customer orders received yet.</p>
+            </div>
+          ) : (
+            <ul>
+              {recentOrders.map((o, i) => {
+                const delivered = o.orderStatus === "DELIVERED";
+                return (
+                  <li key={o._id || i} className={i < recentOrders.length - 1 ? "border-b border-[#F1F5F9]" : ""}>
+                    <Link href={`/seller/dashboard/orders/${o._id}`} className="flex items-center justify-between gap-3 px-4 md:px-5 py-3 hover:bg-[#F8FAFC]">
+                      <span className="flex items-center gap-3 min-w-0">
+                        <span className="w-9 h-9 rounded-lg bg-[#F1F5F9] flex items-center justify-center shrink-0">
+                          {delivered ? <Check className="w-4 h-4 text-[#059669]" /> : <Package className="w-4 h-4 text-[#016073]" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-[#0F172A]">{o.orderNumber || "ORDER"}</span>
+                          <span className="block text-xs text-[#64748B] truncate">
+                            {o.items?.length || 1} Items · {o.customer?.name || o.customerName || "Customer"} · {o.paymentMethod || "COD"}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-sm font-extrabold text-[#0F172A]">NPR {o.totalAmount}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusPill(o.orderStatus)}`}>{o.orderStatus}</span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* ── Recent notifications (app shows this card only when there are any) ── */}
+        {notifications.length > 0 && (
+          <section className="bg-white border border-[#F1F5F9] rounded-[14px] shadow-sm self-start">
+            <div className="flex items-center justify-between px-4 md:px-5 py-3.5">
+              <h2 className="text-[15px] font-extrabold text-[#0F172A]">Recent Notifications</h2>
+              <Link href="/seller/dashboard/notifications" className="text-xs font-bold text-[#016073] hover:underline">View All ({unread} new)</Link>
+            </div>
+            <ul>
+              {notifications.slice(0, 3).map((n, i, arr) => (
+                <li key={n._id || i} className={i < arr.length - 1 ? "border-b border-[#F1F5F9]" : ""}>
+                  <Link href={notificationHref(n)} className="flex items-start gap-3 px-4 md:px-5 py-3 hover:bg-[#F8FAFC]">
+                    <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${n.isRead ? "bg-[#CBD5E1]" : "bg-[#016073]"}`} />
+                    <span className="min-w-0">
+                      <span className={`block text-sm text-[#0F172A] ${n.isRead ? "" : "font-bold"}`}>{n.title || "Notification"}</span>
+                      <span className="block text-xs text-[#64748B] line-clamp-2">{n.message}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Metric({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  value,
+  valueColor = "#0F172A",
+  label,
+  href,
+  highlight = false,
+}: {
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  value: string;
+  valueColor?: string;
+  label: string;
+  href?: string;
+  highlight?: boolean;
+}) {
+  const body = (
+    <div
+      className={`h-full bg-white rounded-xl shadow-sm p-4 ${highlight ? "border-[1.5px] border-[#F59E0B]" : "border border-[#F1F5F9]"} ${href ? "hover:shadow-md transition-shadow" : ""}`}
+    >
+      <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: iconBg }}>
+        <Icon className="w-4 h-4" style={{ color: iconColor }} />
+      </span>
+      <p className="mt-2.5 text-[15px] font-extrabold truncate" style={{ color: valueColor }}>{value}</p>
+      <p className="text-xs text-[#64748B]">{label}</p>
+    </div>
+  );
+  return href ? <Link href={href} className="block">{body}</Link> : body;
+}
+
+function Shortcut({ href, icon: Icon, label, cod = false }: { href: string; icon: React.ElementType; label: string; cod?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`flex flex-col items-center justify-center gap-2 py-4 rounded-[10px] hover:brightness-[0.97] ${
+        cod ? "bg-[linear-gradient(180deg,#FEF9C3,#FFFBEB)]" : "bg-[linear-gradient(180deg,#E6F4F6,#F0F9FA)]"
+      }`}
+    >
+      <Icon className="w-[22px] h-[22px]" style={{ color: cod ? "#854D0E" : "#016073" }} />
+      <span className="text-xs font-bold" style={{ color: cod ? "#854D0E" : "#016073" }}>{label}</span>
+    </Link>
   );
 }

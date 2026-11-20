@@ -15,6 +15,8 @@ const USEFUL_LINKS = [
   { label: "FAQs", href: "/faqs" },
   { label: "Security", href: "/security" },
   { label: "Contact Us", href: "/contact-us" },
+  // Seller Hub entry (login / register / dashboard)
+  { label: "Become a Seller", href: "/seller" },
 ];
 
 // ── Real Categories in 3 Columns from System Catalog ──

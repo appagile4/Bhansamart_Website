@@ -1,163 +1,143 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  Users,
-  Search,
-  Download,
-  Mail,
-  Phone,
-  ShoppingCart,
-  Calendar,
-  CheckCircle2,
-} from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { fetchVendorCustomers } from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import React, { useMemo, useState } from "react";
+import { Mail, MapPin, Phone, RefreshCw, Search, Users } from "lucide-react";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import { formatDate, initials, npr } from "@/lib/seller/format";
+import { EmptyState, ErrorBanner, LoadingBlock, PageHeader, StatCard, Tabs, btn } from "@/components/vendor/ui";
 
-export default function VendorCustomersPage() {
-  const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const customers = vendorState?.customers ?? [];
-  const customersLoading = vendorState?.customersLoading ?? false;
-  const [searchQuery, setSearchQuery] = useState("");
+// app: cusotmer.tsx filter chips
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "cancelled", label: "Has Cancellations" },
+  { key: "top_buyers", label: "Top Buyers" },
+] as const;
+type FilterKey = (typeof FILTERS)[number]["key"];
 
-  useEffect(() => {
-    dispatch(fetchVendorCustomers());
-  }, [dispatch]);
+export default function CustomersPage() {
+  const { data, error, loading, reload } = useAsync(() => api.getCustomers(), "customers");
+  const customers = useMemo(() => data || [], [data]);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
 
-  const filtered = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone.toLowerCase().includes(searchQuery.toLowerCase())
+  const summary = useMemo(
+    () => ({
+      customers: customers.length,
+      orders: customers.reduce((n, c) => n + (c.orderCount || 0), 0),
+      products: customers.reduce((n, c) => n + (c.productCount || 0), 0),
+      cancelled: customers.reduce((n, c) => n + (c.cancelledCount || 0), 0),
+    }),
+    [customers]
   );
 
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = customers.filter((c) => !q || [c.name, c.phone, c.email].some((f) => (f || "").toLowerCase().includes(q)));
+    if (filter === "active") list = list.filter((c) => c.orderCount - c.cancelledCount > 0);
+    if (filter === "cancelled") list = list.filter((c) => c.cancelledCount > 0);
+    if (filter === "top_buyers") list = [...list].sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0));
+    return list;
+  }, [customers, filter, search]);
+
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Customer Relations</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Customer List</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Store Customers
-            </h1>
-          </div>
-
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5"
-          >
-            <Download className="w-4 h-4 text-gray-500" />
-            Export Directory
+    <>
+      <PageHeader
+        title="Store Customers"
+        subtitle="Customer purchase & order history with your store."
+        actions={
+          <button type="button" onClick={reload} className={btn.outline} aria-label="Refresh">
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
+        }
+      />
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Customers" value={summary.customers} />
+          <StatCard label="Store Orders" value={summary.orders} />
+          <StatCard label="Products Sold" value={summary.products} />
+          <StatCard label="Cancelled" value={summary.cancelled} />
         </div>
 
-        {/* ── Search Toolbar ── */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by customer name, email or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 focus:bg-white text-xs pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none transition-all placeholder:text-gray-400"
-            />
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, phone, or email..."
+            aria-label="Search customers"
+            className="w-full h-11 bg-white text-sm pl-10 pr-4 rounded-xl border border-slate-200 focus:border-vendor-dark focus:ring-2 focus:ring-vendor-100 focus:outline-none"
+          />
+        </div>
+
+        <Tabs tabs={FILTERS} active={filter} onChange={setFilter} />
+
+        {error && <ErrorBanner message={error} onRetry={reload} />}
+
+        {loading && !data ? (
+          <LoadingBlock text="Fetching store customers…" />
+        ) : visible.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState icon={Users} title="No customers yet" text="Customers who order from your store will be listed here." />
           </div>
-          <span className="text-xs font-semibold text-gray-400">
-            {filtered.length} customer(s)
-          </span>
-        </div>
-
-        {/* ── Customers Table ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                <tr>
-                  <th className="px-5 py-3.5">Customer</th>
-                  <th className="px-5 py-3.5">Contact Details</th>
-                  <th className="px-5 py-3.5">Orders Placed</th>
-                  <th className="px-5 py-3.5">Total Spent</th>
-                  <th className="px-5 py-3.5">Delivered</th>
-                  <th className="px-5 py-3.5 text-right">Last Order</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {customersLoading && customers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-gray-400">
-                      Loading customer directory...
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-gray-400">
-                      <Users className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                      <p className="font-semibold text-gray-600">No customers found</p>
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((c) => (
-                    <tr key={c._id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-green-600 to-emerald-400 text-white font-bold flex items-center justify-center shrink-0">
-                            {c.name ? c.name[0].toUpperCase() : "C"}
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-900">{c.name}</p>
-                            <span className="text-[10px] text-gray-400">
-                              ID: {c.customerId || c._id.slice(-6)}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 space-y-0.5">
-                        <p className="text-gray-900 font-medium flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 text-gray-400" />
-                          {c.phone || "N/A"}
-                        </p>
-                        <p className="text-gray-400 text-[11px] flex items-center gap-1.5">
-                          <Mail className="w-3 h-3 text-gray-400" />
-                          {c.email || "N/A"}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 font-bold text-gray-900">
-                        {c.orderCount} order(s)
-                      </td>
-                      <td className="px-5 py-3.5 font-black text-gray-900">
-                        ₹{c.totalSpent.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-[#0C831F]">
-                          {c.deliveredCount} delivered
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-gray-400">
-                        {c.lastOrderDate
-                          ? new Date(c.lastOrderDate).toLocaleDateString()
-                          : "Recently"}
-                      </td>
-                    </tr>
-                  ))
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+            {visible.map((c) => (
+              <article key={c._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-11 h-11 rounded-full bg-gradient-to-tr from-vendor to-vendor-accent text-white font-bold flex items-center justify-center overflow-hidden shrink-0">
+                    {c.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      initials(c.name)
+                    )}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{c.name || "Customer"}</p>
+                    {c.email && (
+                      <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                        <Mail className="w-3 h-3" /> {c.email}
+                      </p>
+                    )}
+                  </div>
+                  {c.phone && (
+                    <a href={`tel:${c.phone}`} className={`${btn.outline} h-9 px-3`} aria-label={`Call ${c.name}`}>
+                      <Phone className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["Total Orders", c.orderCount],
+                    ["Products Bought", c.productCount],
+                    ["Cancelled", c.cancelledCount],
+                  ].map(([k, val]) => (
+                    <div key={k} className="rounded-xl bg-slate-50 py-2">
+                      <p className="text-base font-extrabold text-slate-900">{val}</p>
+                      <p className="text-[10px] text-slate-500">{k}</p>
+                    </div>
+                  ))}
+                </div>
+                {c.lastAddress && (
+                  <p className="text-[11px] text-slate-500 flex items-start gap-1">
+                    <MapPin className="w-3 h-3 mt-0.5 shrink-0" /> {c.lastAddress}
+                  </p>
                 )}
-              </tbody>
-            </table>
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
+                  <span className="text-slate-500">
+                    Total Purchases: <span className="font-extrabold text-slate-900">{npr(c.totalSpent)}</span>
+                  </span>
+                  <span className="text-slate-400">Last order {formatDate(c.lastOrderDate)}</span>
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+        )}
       </div>
-    </VendorLayout>
+    </>
   );
 }

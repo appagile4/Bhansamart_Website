@@ -1,514 +1,401 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  CircleDollarSign,
-  TrendingUp,
-  Download,
-  Plus,
+  AlertCircle,
   ArrowDownLeft,
   ArrowUpRight,
-  Clock,
   CheckCircle2,
-  XCircle,
-  Truck,
-  Building2,
-  Smartphone,
-  X,
-  AlertCircle,
+  Clock,
+  FileText,
+  HandCoins,
+  Info,
+  Landmark,
+  Loader2,
+  Percent,
   RefreshCw,
+  RotateCcw,
+  ShieldAlert,
+  X,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import {
-  fetchVendorTransactions,
-  fetchVendorStats,
-  fetchCodDueRiders,
-  confirmCodHandover,
-  requestVendorWithdrawal,
-} from "@/redux/slices/vendorSlice";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useAppDispatch } from "@/redux/hooks";
+import { fetchVendorStats } from "@/redux/slices/vendorSlice";
+import { useVendor } from "@/lib/seller/useVendor";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import { TXN_LABELS } from "@/lib/seller/format";
+import type { SellerTransaction } from "@/lib/seller/types";
 
-export default function VendorTransactionsPage() {
+/*
+ * Mirrors the app's VendorMain/transaction.tsx ("Finance & Payouts"): same sections, wording,
+ * filter tabs, per-type icons/labels/colours (from that screen's StyleSheet) and withdraw modal.
+ */
+const TABS = [
+  { key: "ALL", label: "All" },
+  { key: "SETTLED", label: "Settled" },
+  { key: "PENDING", label: "Pending" },
+  { key: "WITHDRAWAL", label: "Payouts" },
+  { key: "COD", label: "COD" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const nprNum = (n?: number | null) => `NPR ${(n || 0).toLocaleString()}`;
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <TransactionsView />
+    </Suspense>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="py-16 flex flex-col items-center gap-2">
+      <Loader2 className="w-5 h-5 animate-spin text-[#016073]" />
+      <p className="text-[13px] text-[#94A3B8]">Loading transactions...</p>
+    </div>
+  );
+}
+
+function TransactionsView() {
+  const params = useSearchParams();
+  const router = useRouter();
   const dispatch = useAppDispatch();
-  const vendorState = useAppSelector((state) => state?.vendor);
-  const stats = vendorState?.stats ?? null;
-  const transactions = vendorState?.transactions ?? [];
-  const txnsLoading = vendorState?.txnsLoading ?? false;
-  const codDueRiders = vendorState?.codDueRiders ?? [];
+  const v = useVendor();
+  const bank = v.vendorProfile?.bankDetails;
+  const { data, error, loading, reload } = useAsync(() => api.getTransactions({ limit: 100 }), "txns");
+  const [tab, setTab] = useState<TabKey>("ALL");
+  const [notice, setNotice] = useState<string | null>(null);
+  const withdrawOpen = params.get("withdraw") === "1";
+  const setWithdrawOpen = (open: boolean) => router.replace(open ? "/seller/dashboard/transactions?withdraw=1" : "/seller/dashboard/transactions");
 
-  const [activeTab, setActiveTab] = useState<"history" | "cod">("history");
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [payoutMethod, setPayoutMethod] = useState("Bank Transfer");
-  const [bankName, setBankName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountHolder, setAccountHolder] = useState("");
-  const [upiId, setUpiId] = useState("");
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [withdrawMsg, setWithdrawMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const wallet = data?.wallet;
+  const txns = useMemo(() => data?.transactions || [], [data]);
+  // app: client-side tab filter
+  const filtered = useMemo(
+    () =>
+      txns.filter((t) => {
+        if (tab === "SETTLED") return t.type === "ORDER_EARNING" && t.status === "SETTLED";
+        if (tab === "PENDING") return t.status === "PENDING" || t.status === "CASH_IN_CUSTODY";
+        // Backend writes WITHDRAWAL, WITHDRAWAL_REQUEST and WITHDRAWAL_PAYOUT (the app only matches the first)
+        if (tab === "WITHDRAWAL") return t.type.startsWith("WITHDRAWAL");
+        if (tab === "COD") return t.type === "COD_COLLECTION" || t.type === "COD_HANDOVER";
+        return true;
+      }),
+    [txns, tab]
+  );
 
-  useEffect(() => {
-    dispatch(fetchVendorTransactions());
-    dispatch(fetchVendorStats());
-    dispatch(fetchCodDueRiders());
-  }, [dispatch]);
-
-  const handleWithdrawSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setWithdrawMsg(null);
-    const amt = parseFloat(withdrawAmount);
-    if (!amt || amt <= 0) {
-      setWithdrawMsg({ type: "error", text: "Please enter a valid withdrawal amount." });
-      return;
-    }
-    if (amt > (stats?.availableWithdrawalBalance ?? 0)) {
-      setWithdrawMsg({ type: "error", text: "Requested amount exceeds available wallet balance." });
-      return;
-    }
-
-    setWithdrawLoading(true);
-    try {
-      const action = await dispatch(
-        requestVendorWithdrawal({
-          amount: amt,
-          paymentMethod: payoutMethod,
-          bankDetails:
-            payoutMethod === "Bank Transfer"
-              ? { bankName, accountNumber, accountHolder }
-              : undefined,
-          upiId: payoutMethod === "UPI" ? upiId : undefined,
-        })
-      );
-
-      if (requestVendorWithdrawal.fulfilled.match(action)) {
-        setWithdrawMsg({
-          type: "success",
-          text: "Withdrawal request submitted successfully! Processing within 24 hours.",
-        });
-        dispatch(fetchVendorStats());
-        dispatch(fetchVendorTransactions());
-        setTimeout(() => setShowWithdrawModal(false), 1500);
-      } else {
-        setWithdrawMsg({
-          type: "error",
-          text: (action.payload as string) || "Failed to submit withdrawal request.",
-        });
-      }
-    } finally {
-      setWithdrawLoading(false);
-    }
-  };
-
-  const handleConfirmHandover = async (riderId: string, amount: number) => {
-    if (confirm(`Confirm cash handover of ₹${amount} received from this rider?`)) {
-      await dispatch(
-        confirmCodHandover({
-          deliveryBoyId: riderId,
-          amountSubmitted: amount,
-          paymentMode: "CASH",
-        })
-      );
-      dispatch(fetchCodDueRiders());
-      dispatch(fetchVendorStats());
-    }
-  };
-
-  const availableBalance = stats?.availableWithdrawalBalance ?? 0;
-  const totalEarned = stats?.totalEarned ?? 0;
-  const pendingSettlement = stats?.pendingSettlement ?? 0;
-  const codInCustody = stats?.codCashWithDeliveryBoys ?? 0;
+  const masked = bank?.accountNumber ? `****${bank.accountNumber.slice(-4)}` : "Not Configured";
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Finance & Wallet</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Transactions</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Wallet & Settlements
-            </h1>
-          </div>
+    <div className="text-[#0F172A]">
+      {/* Sub header */}
+      <div className="flex items-start justify-between gap-3 bg-white border border-[#F1F5F9] rounded-xl px-4 py-3 mb-4">
+        <div>
+          <h1 className="text-lg font-extrabold text-[#016073]">Finance & Payouts</h1>
+          <p className="text-xs text-[#64748B] mt-0.5">Real-time earnings, COD cash tracking, and bank withdrawals</p>
+        </div>
+        <button type="button" onClick={reload} className="p-2 rounded-lg text-[#016073] hover:bg-[#E6F4F6] cursor-pointer" aria-label="Refresh">
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
 
-          <div className="flex items-center gap-2.5">
+      <div className="space-y-2">
+        {notice && (
+          <p className="rounded-lg bg-[#F0FDF4] border border-[#BBF7D0] px-3 py-2 text-xs font-semibold text-[#15803D]" role="status">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <p className="rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] px-3 py-2 text-xs font-semibold text-[#991B1B]" role="alert">
+            {error}{" "}
+            <button type="button" onClick={reload} className="underline cursor-pointer">Retry</button>
+          </p>
+        )}
+
+        {/* Balance banner */}
+        <section className="rounded-[14px] bg-[#016073] text-white p-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-[#86C4CB]">Withdrawable Balance</p>
+            <p className="text-2xl md:text-3xl font-extrabold text-white mt-0.5">{nprNum(wallet?.withdrawableBalance)}</p>
+            <p className="text-xs text-[#E2E8F0] mt-0.5">Pending Settlement: {nprNum(wallet?.pendingSettlement)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWithdrawOpen(true)}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg bg-[#008080] hover:brightness-110 text-white text-sm font-bold cursor-pointer"
+          >
+            <Landmark className="w-4 h-4" /> Withdraw
+          </button>
+        </section>
+
+        {/* COD in custody alert */}
+        {(wallet?.codCashWithDeliveryBoys || 0) > 0 && (
+          <div className="flex items-center gap-2 rounded-lg bg-[#FEF9C3] border border-[#FDE047] px-3 py-2.5">
+            <HandCoins className="w-4 h-4 text-[#854D0E] shrink-0" />
+            <p className="text-xs font-semibold text-[#854D0E]">NPR {(wallet?.codCashWithDeliveryBoys || 0).toLocaleString()} Cash on Delivery currently with riders.</p>
+          </div>
+        )}
+
+        {/* Pending recovery deficit alert */}
+        {(wallet?.pendingRecoveries || 0) > 0 && (
+          <div className="flex items-center gap-2 rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] px-3 py-2.5">
+            <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0" />
+            <p className="text-xs font-semibold text-[#991B1B]">
+              NPR {(wallet?.pendingRecoveries || 0).toLocaleString()} Pending Recovery Deficit: Deducted automatically from future payouts due to post-withdrawal refund.
+            </p>
+          </div>
+        )}
+
+        <p className="flex items-center gap-1.5 text-xs text-[#64748B]">
+          <Info className="w-3.5 h-3.5 text-[#86C4CB] shrink-0" />
+          Payouts sent to registered bank ({bank?.bankName || "Bank"} A/C {masked}).
+        </p>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar my-4" role="tablist">
+        {TABS.map((t) => {
+          const on = tab === t.key;
+          return (
             <button
-              onClick={() => setShowWithdrawModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setTab(t.key)}
+              className={`shrink-0 px-4 py-1.5 rounded-full text-[13px] cursor-pointer ${on ? "bg-[#016073] text-white font-bold" : "bg-[#E2E8F0] text-[#475569] font-semibold"}`}
             >
-              <CircleDollarSign className="w-4 h-4" />
-              Request Payout
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Transactions list */}
+      {loading && !data ? (
+        <Loading />
+      ) : filtered.length === 0 ? (
+        <div className="py-14 flex flex-col items-center gap-2">
+          <FileText className="w-8 h-8 text-[#CBD5E1]" />
+          <p className="text-[13px] text-[#94A3B8]">No transactions found for this filter.</p>
+        </div>
+      ) : (
+        <ul className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
+          {filtered.map((t) => (
+            <TxnCard key={t._id} t={t} />
+          ))}
+        </ul>
+      )}
+
+      <WithdrawPayoutModal
+        open={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        available={wallet?.withdrawableBalance || 0}
+        bankName={bank?.bankName}
+        masked={masked}
+        holder={bank?.accountHolderName || v.vendorProfile?.businessDetails?.businessName || "Store"}
+        onDone={(m) => {
+          setNotice(m);
+          reload();
+          dispatch(fetchVendorStats());
+        }}
+      />
+    </div>
+  );
+}
+
+// app: renderTransactionCard — type → label / icon / colours
+const APP_TYPE_LABELS: Record<string, string> = {
+  ORDER_EARNING: "Order Settlement",
+  COD_COLLECTION: "COD in Rider Custody",
+  COD_HANDOVER: "COD Store Handover",
+  WITHDRAWAL: "Bank Withdrawal",
+  DIRECT_QR_PAYMENT: "Direct Store QR Paid",
+  REFUND_DEDUCTION: "Customer Refund Deduction",
+  COMMISSION_REVERSAL: "Commission Reversal (+1.5%)",
+  COMMISSION_DEDUCTION: "Platform Commission (-1.5%)",
+  RECOVERY_ADJUSTMENT: "Deficit Recovery Offset",
+};
+
+function TxnCard({ t }: { t: SellerTransaction }) {
+  const isDirectQr = t.type === "DIRECT_QR_PAYMENT";
+  const isCredit = t.type === "ORDER_EARNING" || t.type === "COD_HANDOVER" || t.type === "COMMISSION_REVERSAL";
+  const isCodCustody = t.type === "COD_COLLECTION";
+
+  let Icon: React.ElementType = isCredit ? ArrowDownLeft : ArrowUpRight;
+  let iconColor = isCredit ? "#16A34A" : "#DC2626";
+  let iconBg = isCredit ? "#F0FDF4" : "#FEF2F2";
+  if (isDirectQr) [Icon, iconColor, iconBg] = [CheckCircle2, "#0284C7", "#F0F9FF"];
+  else if (isCodCustody) [Icon, iconColor, iconBg] = [Clock, "#D97706", "#FFFBEB"];
+  else if (t.type === "REFUND_DEDUCTION") [Icon, iconColor, iconBg] = [RotateCcw, "#DC2626", "#FEF2F2"];
+  else if (t.type === "COMMISSION_REVERSAL") [Icon, iconColor, iconBg] = [RefreshCw, "#16A34A", "#F0FDF4"];
+  else if (t.type === "COMMISSION_DEDUCTION") [Icon, iconColor, iconBg] = [Percent, "#EA580C", "#FFF7ED"];
+  else if (t.type === "RECOVERY_ADJUSTMENT") [Icon, iconColor, iconBg] = [ShieldAlert, "#7C3AED", "#F5F3FF"];
+
+  // Types the app doesn't know fall back to the website's labels instead of the app's catch-all "Platform Fee"
+  const typeLabel = APP_TYPE_LABELS[t.type] || TXN_LABELS[t.type] || "Platform Fee";
+  const order = typeof t.order === "object" && t.order ? t.order : null;
+  const title = order?.orderNumber ? `Order #${order.orderNumber}` : t.notes || typeLabel;
+  const when = new Date(t.createdAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const amountColor = isDirectQr ? "#0284C7" : isCodCustody ? "#D97706" : isCredit ? "#15803D" : "#DC2626";
+  const prefix = isCodCustody ? "" : isDirectQr ? "✓ " : isCredit ? "+" : "-";
+
+  const badge: Record<string, [string, string]> = {
+    SETTLED: ["#DCFCE7", "#15803D"],
+    COMPLETED: ["#DCFCE7", "#15803D"],
+    DIRECT_SETTLED: ["#E0F2FE", "#0369A1"],
+    CASH_IN_CUSTODY: ["#FEF9C3", "#854D0E"],
+    PENDING: ["#EFF6FF", "#1D4ED8"],
+    RECOVERED: ["#F3E8FF", "#7E22CE"],
+  };
+  const [badgeBg, badgeColor] = badge[t.status] || ["#F1F5F9", "#475569"];
+  const statusText = t.status === "CASH_IN_CUSTODY" ? "In Custody" : t.status === "DIRECT_SETTLED" ? "Direct Paid" : t.status;
+
+  return (
+    <li className="flex items-center justify-between gap-3 bg-white border border-[#F1F5F9] rounded-xl px-3.5 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="w-[38px] h-[38px] rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: iconBg }}>
+          <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} />
+        </span>
+        <div className="min-w-0 pr-2">
+          <p className="text-sm font-bold text-[#0F172A] truncate">{title}</p>
+          <p className="text-xs text-[#64748B] truncate">
+            {typeLabel} · {when}
+          </p>
+          {(t.grossAmount || 0) > 0 && (t.commission || 0) > 0 && (
+            <p className="text-[11px] text-[#94A3B8]">
+              Gross: NPR {t.grossAmount} · Superadmin Fee (1.5%): NPR {t.commission}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <p className="text-sm font-extrabold" style={{ color: amountColor }}>
+          {prefix} NPR {Math.abs(t.amount).toLocaleString()}
+        </p>
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: badgeBg, color: badgeColor }}>
+          {statusText}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+/** app: transaction.tsx "Withdraw Payout" modal (min NPR 100, max = withdrawable balance) */
+function WithdrawPayoutModal({
+  open,
+  onClose,
+  available,
+  bankName,
+  masked,
+  holder,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  available: number;
+  bankName?: string;
+  masked: string;
+  holder: string;
+  onDone: (message: string) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ title: string; text: string } | null>(null);
+
+  const close = () => {
+    setAmount("");
+    setNotes("");
+    setError(null);
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const submit = async () => {
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) return setError({ title: "Invalid Amount", text: "Please enter a valid withdrawal amount." });
+    if (amt < 100) return setError({ title: "Minimum Limit", text: "Minimum withdrawal amount is NPR 100." });
+    if (amt > available) return setError({ title: "Insufficient Balance", text: `Your withdrawable balance is NPR ${available.toLocaleString()}.` });
+    setBusy(true);
+    setError(null);
+    try {
+      await api.requestWithdrawal(amt, notes.trim() || undefined);
+      onDone(`Withdrawal Requested: Withdrawal of NPR ${amt.toLocaleString()} has been queued for daily bank settlement.`);
+      close();
+    } catch (e) {
+      setError({ title: "Withdrawal Failed", text: api.errorText(e, "Failed to process withdrawal request.") });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[55] bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="withdraw-title" onMouseDown={close}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#F1F5F9]">
+          <h2 id="withdraw-title" className="text-base font-extrabold text-[#016073]">Withdraw Payout</h2>
+          <button type="button" onClick={close} className="p-1 rounded-lg hover:bg-[#F8FAFC] cursor-pointer" aria-label="Close">
+            <X className="w-5 h-5 text-[#64748B]" />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="rounded-lg bg-[#F0FDF4] px-3 py-2.5">
+            <p className="text-xs text-[#15803D]">Available Withdrawable Balance:</p>
+            <p className="text-lg font-extrabold text-[#15803D]">NPR {available.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg bg-[#F8FAFC] px-3 py-2.5">
+            <p className="text-xs text-[#64748B]">Payout Destination:</p>
+            <p className="text-sm font-bold text-[#0F172A]">
+              {bankName || "Bank"} • A/C: {masked}
+            </p>
+            <p className="text-xs text-[#94A3B8]">Holder: {holder}</p>
+          </div>
+          <label className="block">
+            <span className="block text-xs font-bold text-[#334155] mb-1">Withdrawal Amount (NPR):</span>
+            <input
+              className="w-full h-10 px-3 rounded-lg border border-[#CBD5E1] text-sm text-[#0F172A] focus:outline-none focus:border-[#016073]"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              placeholder="e.g. 5000"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-bold text-[#334155] mb-1">Remarks / Reference (Optional):</span>
+            <textarea
+              className="w-full h-16 px-3 py-2 rounded-lg border border-[#CBD5E1] text-sm text-[#0F172A] focus:outline-none focus:border-[#016073] resize-none"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Weekly settlement"
+            />
+          </label>
+          {error && (
+            <p className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-xs text-[#991B1B]" role="alert">
+              <span className="font-bold">{error.title}:</span> {error.text}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <button type="button" onClick={close} className="h-10 rounded-lg bg-[#F1F5F9] text-[#64748B] text-sm font-bold cursor-pointer">
+              Cancel
+            </button>
+            <button type="button" onClick={submit} disabled={busy} className="h-10 rounded-lg bg-[#016073] text-white text-sm font-bold inline-flex items-center justify-center cursor-pointer disabled:opacity-70">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Withdrawal"}
             </button>
           </div>
         </div>
-
-        {/* ── 4 Wallet Stat Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Available to Withdraw
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-green-50 text-[#0C831F] flex items-center justify-center">
-                <CircleDollarSign className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-2xl font-black text-gray-900 mt-3">
-              ₹{availableBalance.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Ready for instant payout</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Total Lifetime Earnings
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-2xl font-black text-gray-900 mt-3">
-              ₹{totalEarned.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Net post commission</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                Pending Settlement
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-2xl font-black text-gray-900 mt-3">
-              ₹{pendingSettlement.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Orders in transit/clearing</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                COD in Rider Custody
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Truck className="w-5 h-5" />
-              </div>
-            </div>
-            <p className="text-2xl font-black text-gray-900 mt-3">
-              ₹{codInCustody.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">Due for handover at hub</p>
-          </div>
-        </div>
-
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-2 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-              activeTab === "history"
-                ? "bg-[#0C831F] text-white shadow-xs"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            Transaction History
-          </button>
-          <button
-            onClick={() => setActiveTab("cod")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-              activeTab === "cod"
-                ? "bg-[#0C831F] text-white shadow-xs"
-                : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            COD Cash Handover ({codDueRiders.length})
-          </button>
-        </div>
-
-        {/* ── TAB 1: Transaction History ── */}
-        {activeTab === "history" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Transaction Type</th>
-                    <th className="px-5 py-3.5">Gross Amount</th>
-                    <th className="px-5 py-3.5">Commission</th>
-                    <th className="px-5 py-3.5">Net Amount</th>
-                    <th className="px-5 py-3.5">Payment Method</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
-                        No transactions recorded yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    transactions.map((tx) => (
-                      <tr key={tx._id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-5 py-3.5 font-bold text-gray-900 flex items-center gap-2">
-                          <span
-                            className={`p-1.5 rounded-lg ${
-                              tx.netAmount >= 0
-                                ? "bg-green-50 text-[#0C831F]"
-                                : "bg-red-50 text-red-600"
-                            }`}
-                          >
-                            {tx.netAmount >= 0 ? (
-                              <ArrowDownLeft className="w-3.5 h-3.5" />
-                            ) : (
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            )}
-                          </span>
-                          {tx.type}
-                        </td>
-                        <td className="px-5 py-3.5 font-medium text-gray-500">
-                          ₹{tx.grossAmount || tx.amount}
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-500">
-                          -₹{tx.commission || 0}
-                        </td>
-                        <td className="px-5 py-3.5 font-black text-gray-900">
-                          ₹{tx.netAmount || tx.amount}
-                        </td>
-                        <td className="px-5 py-3.5 uppercase font-semibold text-gray-600">
-                          {tx.paymentMethod || "COD"}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-green-100 text-green-800">
-                            {tx.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-400">
-                          {new Date(tx.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── TAB 2: COD Cash Handover ── */}
-        {activeTab === "cod" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-gray-100">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                Rider Cash-on-Delivery Collections
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Riders who collected cash from customers and must submit it to your store hub.
-              </p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                  <tr>
-                    <th className="px-5 py-3.5">Delivery Boy</th>
-                    <th className="px-5 py-3.5">Contact</th>
-                    <th className="px-5 py-3.5">Orders Delivered</th>
-                    <th className="px-5 py-3.5">Total Cash Due</th>
-                    <th className="px-5 py-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {codDueRiders.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
-                        No outstanding COD cash due from delivery boys.
-                      </td>
-                    </tr>
-                  ) : (
-                    codDueRiders.map((r, i) => (
-                      <tr key={i} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-5 py-3.5 font-bold text-gray-900">
-                          {r.deliveryBoy?.fullName || "Assigned Rider"}
-                        </td>
-                        <td className="px-5 py-3.5 text-gray-500">
-                          {r.deliveryBoy?.phone || "N/A"}
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold">
-                          {r.ordersCount || r.orders?.length || 0} order(s)
-                        </td>
-                        <td className="px-5 py-3.5 font-black text-gray-900 text-sm">
-                          ₹{r.totalDue}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            onClick={() =>
-                              handleConfirmHandover(r.deliveryBoy._id, r.totalDue)
-                            }
-                            className="px-3.5 py-1.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            Confirm Handover Received
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── Request Withdrawal Modal ── */}
-        {showWithdrawModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 animate-scaleUp">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                <h3 className="text-lg font-black text-gray-900">
-                  Request Payout / Withdrawal
-                </h3>
-                <button
-                  onClick={() => setShowWithdrawModal(false)}
-                  className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {withdrawMsg && (
-                <div
-                  className={`mt-4 p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
-                    withdrawMsg.type === "success"
-                      ? "bg-green-50 text-green-700 border border-green-200"
-                      : "bg-red-50 text-red-700 border border-red-200"
-                  }`}
-                >
-                  {withdrawMsg.type === "success" ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                  )}
-                  <span>{withdrawMsg.text}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleWithdrawSubmit} className="space-y-4 mt-4">
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 flex justify-between items-center text-xs">
-                  <span className="text-gray-500">Available Balance:</span>
-                  <span className="font-black text-gray-900 text-sm">
-                    ₹{availableBalance.toLocaleString()}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Amount to Withdraw (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    min="100"
-                    max={availableBalance}
-                    required
-                    placeholder="e.g. 5000"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-sm font-bold px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Payout Destination
-                  </label>
-                  <select
-                    value={payoutMethod}
-                    onChange={(e) => setPayoutMethod(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                  >
-                    <option value="Bank Transfer">Bank Transfer (NEFT / IMPS)</option>
-                    <option value="UPI">UPI ID / VPA</option>
-                  </select>
-                </div>
-
-                {payoutMethod === "Bank Transfer" ? (
-                  <>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Bank Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. HDFC Bank, SBI, Nabil Bank"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Account Number
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Account number"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      UPI ID
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. vendor@okhdfcbank"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2.5 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowWithdrawModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={withdrawLoading}
-                    className="flex-1 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-60"
-                  >
-                    {withdrawLoading ? "Submitting..." : "Submit Payout Request"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
-    </VendorLayout>
+    </div>
   );
 }

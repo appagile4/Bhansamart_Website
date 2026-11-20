@@ -1,293 +1,214 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Sliders,
-  Plus,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Tag,
-  ShieldCheck,
-  AlertCircle,
-  X,
-} from "lucide-react";
-import VendorLayout from "@/components/vendor/VendorLayout";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Clock, PackagePlus, Plus, Search, SlidersHorizontal, Sparkles, Tags } from "lucide-react";
+import * as api from "@/lib/seller/api";
+import { useAsync } from "@/lib/seller/useAsync";
+import { formatDate } from "@/lib/seller/format";
+import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
+import BrandRequestModal from "@/components/vendor/BrandRequestModal";
+import AttributeModal from "@/components/vendor/AttributeModal";
+import { Card, EmptyState, ErrorBanner, LoadingBlock, PageHeader, SuccessBanner, Tabs, btn, field } from "@/components/vendor/ui";
 
-interface BrandRequest {
-  _id: string;
-  brandName: string;
-  category: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  createdAt: string;
+const TABS = [
+  { key: "brands", label: "Brands" },
+  { key: "attributes", label: "Attributes" },
+  { key: "requests", label: "My Brand Requests" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+export default function BrandsAttributesPage() {
+  return (
+    <Suspense fallback={<LoadingBlock />}>
+      <BrandsAttributesView />
+    </Suspense>
+  );
 }
 
-export default function VendorAttributesPage() {
-  const [brandRequests, setBrandRequests] = useState<BrandRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [newBrandName, setNewBrandName] = useState("");
-  const [newBrandCategory, setNewBrandCategory] = useState("Grocery");
-  const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+function BrandsAttributesView() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const raw = params.get("tab");
+  const tab: TabKey = TABS.some((t) => t.key === raw) ? (raw as TabKey) : "brands";
+  const [category, setCategory] = useState("");
+  const [search, setSearch] = useState("");
+  const [brandModal, setBrandModal] = useState(false);
+  const [attrModal, setAttrModal] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadBrands() {
-      try {
-        const token = localStorage.getItem("bhansa_vendor_token");
-        const res = await fetch("/api/vendor/brand-requests", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const data = await res.json();
-        if (data && data.brandRequests) {
-          setBrandRequests(data.brandRequests);
-        } else {
-          // Provide default sample approved brand list
-          setBrandRequests([
-            {
-              _id: "br_1",
-              brandName: "Amul",
-              category: "Dairy, Bread & Eggs",
-              status: "APPROVED",
-              createdAt: new Date().toISOString(),
-            },
-            {
-              _id: "br_2",
-              brandName: "Nestle",
-              category: "Packaged Foods",
-              status: "APPROVED",
-              createdAt: new Date().toISOString(),
-            },
-            {
-              _id: "br_3",
-              brandName: "Farm Fresh Organics",
-              category: "Fruits & Vegetables",
-              status: "APPROVED",
-              createdAt: new Date().toISOString(),
-            },
-          ]);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadBrands();
-  }, []);
+  const brands = useAsync(() => api.getBrands({ category: category || undefined, limit: 200 }), `b-${category}`);
+  const attrs = useAsync(() => api.getAttributes({ category: category || undefined }), `a-${category}`);
+  const requests = useAsync(() => api.getMyBrandRequests(), "requests");
 
-  const handleRequestBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBrandName.trim()) return;
+  const q = search.trim().toLowerCase();
+  const brandList = useMemo(() => (brands.data || []).filter((b) => b.status === "APPROVED" && (!q || b.name.toLowerCase().includes(q))), [brands.data, q]);
+  const attrList = useMemo(() => (attrs.data || []).filter((a) => !q || a.name.toLowerCase().includes(q) || a.values.some((v) => v.toLowerCase().includes(q))), [attrs.data, q]);
+  const reqList = useMemo(() => (requests.data || []).filter((b) => !q || b.name.toLowerCase().includes(q)), [requests.data, q]);
 
-    setSubmitting(true);
-    setMsg(null);
-    try {
-      const token = localStorage.getItem("bhansa_vendor_token");
-      const res = await fetch("/api/vendor/brand-requests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          brandName: newBrandName.trim(),
-          category: newBrandCategory,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMsg("Brand authorization request submitted for review!");
-        setBrandRequests([
-          {
-            _id: `br_${Date.now()}`,
-            brandName: newBrandName.trim(),
-            category: newBrandCategory,
-            status: "PENDING",
-            createdAt: new Date().toISOString(),
-          },
-          ...brandRequests,
-        ]);
-        setTimeout(() => setShowRequestModal(false), 1500);
-      } else {
-        setMsg(data.message || "Failed to submit brand request.");
-      }
-    } catch {
-      setMsg("Network error submitting brand request.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const statusCls = (s: string) =>
+    s === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : s === "REJECTED" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200";
 
   return (
-    <VendorLayout>
-      <div className="space-y-6">
-        {/* ── Breadcrumb & Top Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <nav className="text-xs text-gray-400 flex items-center gap-1.5 mb-1">
-              <Link href="/seller/dashboard" className="hover:text-gray-700">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-gray-500 font-medium">Catalog Settings</span>
-              <span>/</span>
-              <span className="text-[#0C831F] font-bold">Brands & Attributes</span>
-            </nav>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-              Brands & Attribute Authorizations
-            </h1>
-          </div>
+    <>
+      <PageHeader
+        title="Brands & Attributes"
+        subtitle="Brands and attributes you can use when listing products."
+        actions={
+          <>
+            <Link href="/seller/dashboard/products/add" className={btn.ghost}>
+              <PackagePlus className="w-4 h-4" /> Add Product
+            </Link>
+            <button type="button" onClick={() => setAttrModal(true)} className={btn.outline}>
+              <SlidersHorizontal className="w-4 h-4" /> Add Attribute
+            </button>
+            <button type="button" onClick={() => setBrandModal(true)} className={btn.primary}>
+              <Plus className="w-4 h-4" /> Request Brand
+            </button>
+          </>
+        }
+      />
 
-          <button
-            onClick={() => setShowRequestModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Request Brand Approval
-          </button>
+      <div className="space-y-4">
+        {notice && <SuccessBanner message={notice} />}
+        <Tabs
+          tabs={TABS}
+          active={tab}
+          onChange={(k) => router.replace(`/seller/dashboard/attributes?tab=${k}`)}
+          counts={{ brands: brandList.length, attributes: attrList.length, requests: requests.data?.length || 0 }}
+        />
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input className={`${field} pl-9`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${tab === "attributes" ? "attributes or values" : "brands"}…`} aria-label="Search" />
+          </div>
+          {tab !== "requests" && (
+            <select className={`${field} sm:w-64`} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+              <option value="">All categories</option>
+              {MAIN_CATEGORY_NAMES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* ── Brand Requests Table ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-              Authorized Brands Catalog
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Brands you have permission to publish and sell through BhansaMart.
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider font-bold border-b border-gray-100">
-                <tr>
-                  <th className="px-5 py-3.5">Brand Name</th>
-                  <th className="px-5 py-3.5">Category</th>
-                  <th className="px-5 py-3.5">Approval Status</th>
-                  <th className="px-5 py-3.5 text-right">Requested Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {brandRequests.map((b) => (
-                  <tr key={b._id} className="hover:bg-gray-50/70 transition-colors">
-                    <td className="px-5 py-3.5 font-bold text-gray-900 flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-[#0C831F] flex items-center justify-center font-bold">
-                        {b.brandName[0]}
-                      </div>
-                      {b.brandName}
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-gray-600">
-                      {b.category}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          b.status === "APPROVED"
-                            ? "bg-green-100 text-green-800"
-                            : b.status === "PENDING"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {b.status === "APPROVED" ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : (
-                          <Clock className="w-3 h-3" />
-                        )}
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right text-gray-400">
-                      {new Date(b.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
+        {tab === "brands" && (
+          <Card>
+            {brands.error && <div className="p-4"><ErrorBanner message={brands.error} onRetry={brands.reload} /></div>}
+            {brands.loading && !brands.data ? (
+              <LoadingBlock text="Loading brands…" />
+            ) : brandList.length === 0 ? (
+              <EmptyState icon={Tags} title="No brands found" text="Can't find your brand? Request it and our team will review it." action={<button type="button" onClick={() => setBrandModal(true)} className={btn.primary}>Request Brand</button>} />
+            ) : (
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
+                {brandList.map((b) => (
+                  <div key={b._id} className="rounded-xl border border-slate-200 p-3 flex flex-col items-center text-center gap-2">
+                    <span className="w-14 h-14 rounded-xl bg-white border border-slate-100 overflow-hidden flex items-center justify-center">
+                      {b.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={b.logo} alt="" className="w-full h-full object-contain" />
+                      ) : (
+                        <Sparkles className="w-6 h-6 text-slate-300" />
+                      )}
+                    </span>
+                    <p className="text-sm font-bold text-slate-900 line-clamp-1">{b.name}</p>
+                    <p className="text-[10px] text-slate-500 line-clamp-2">{b.categories?.join(", ") || "All categories"}</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Request Modal ── */}
-        {showRequestModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 animate-scaleUp">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                <h3 className="text-lg font-black text-gray-900">
-                  Request Brand Approval
-                </h3>
-                <button
-                  onClick={() => setShowRequestModal(false)}
-                  className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
+            )}
+          </Card>
+        )}
 
-              {msg && (
-                <div className="my-3 p-3 rounded-xl bg-green-50 text-green-700 text-xs font-semibold">
-                  {msg}
-                </div>
-              )}
+        {tab === "attributes" && (
+          <Card>
+            {attrs.error && <div className="p-4"><ErrorBanner message={attrs.error} onRetry={attrs.reload} /></div>}
+            {attrs.loading && !attrs.data ? (
+              <LoadingBlock text="Loading attributes…" />
+            ) : attrList.length === 0 ? (
+              <EmptyState icon={SlidersHorizontal} title="No attributes found" action={<button type="button" onClick={() => setAttrModal(true)} className={btn.primary}>Add Attribute</button>} />
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {attrList.map((a) => (
+                  <li key={a._id} className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-extrabold text-vendor-dark">{a.name}</p>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase">{a.type || "single"}</span>
+                      {a.isGlobal && <span className="px-2 py-0.5 rounded-full bg-vendor-soft text-vendor-dark text-[10px] font-bold">GLOBAL</span>}
+                      <span className="text-[11px] text-slate-500">{a.categories?.join(", ")}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {a.values.map((v) => (
+                        <span key={v} className="px-2 py-0.5 rounded-md bg-vendor-soft text-vendor-dark text-[11px] font-semibold">
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
 
-              <form onSubmit={handleRequestBrand} className="space-y-4 mt-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Brand Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Britannia, Kellogg's, Coca-Cola"
-                    value={newBrandName}
-                    onChange={(e) => setNewBrandName(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Primary Category
-                  </label>
-                  <select
-                    value={newBrandCategory}
-                    onChange={(e) => setNewBrandCategory(e.target.value)}
-                    className="w-full bg-gray-50 focus:bg-white text-xs px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#0C831F] focus:outline-none"
-                  >
-                    <option value="Dairy, Bread & Eggs">Dairy, Bread & Eggs</option>
-                    <option value="Fruits & Vegetables">Fruits & Vegetables</option>
-                    <option value="Snacks & Munchies">Snacks & Munchies</option>
-                    <option value="Cold Drinks & Juices">Cold Drinks & Juices</option>
-                    <option value="Packaged Foods">Packaged Foods</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-2.5 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowRequestModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="flex-1 py-2.5 rounded-xl bg-[#0C831F] hover:bg-[#0A701A] text-white text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    {submitting ? "Submitting..." : "Submit for Approval"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+        {tab === "requests" && (
+          <Card>
+            {requests.error && <div className="p-4"><ErrorBanner message={requests.error} onRetry={requests.reload} /></div>}
+            {requests.loading && !requests.data ? (
+              <LoadingBlock text="Loading requests…" />
+            ) : reqList.length === 0 ? (
+              <EmptyState icon={Clock} title="No brand requests" text="Brands you request appear here with their review status." />
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {reqList.map((b) => (
+                  <li key={b._id} className="px-5 py-4 flex items-center gap-4">
+                    <span className="w-12 h-12 rounded-xl bg-white border border-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                      {b.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={b.logo} alt="" className="w-full h-full object-contain" />
+                      ) : (
+                        <Sparkles className="w-5 h-5 text-slate-300" />
+                      )}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900">{b.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {b.categories?.join(", ")} · Requested {formatDate(b.createdAt)}
+                      </p>
+                      {b.status === "REJECTED" && b.rejectionReason && <p className="text-[11px] text-red-600 mt-0.5">Reason: {b.rejectionReason}</p>}
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${statusCls(b.status)}`}>{b.status}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         )}
       </div>
-    </VendorLayout>
+
+      <BrandRequestModal
+        open={brandModal}
+        onClose={() => setBrandModal(false)}
+        defaultCategory={category || undefined}
+        onSubmitted={(m) => {
+          setNotice(m);
+          requests.reload();
+          brands.reload();
+          router.replace("/seller/dashboard/attributes?tab=requests");
+        }}
+      />
+      <AttributeModal
+        open={attrModal}
+        onClose={() => setAttrModal(false)}
+        defaultCategory={category || undefined}
+        onSubmitted={(m) => {
+          setNotice(m);
+          attrs.reload();
+          router.replace("/seller/dashboard/attributes?tab=attributes");
+        }}
+      />
+    </>
   );
 }
