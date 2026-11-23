@@ -7,6 +7,7 @@ import { initializeAuth } from "./slices/authSlice";
 import { initializeCart, fetchBackendCart } from "./slices/cartSlice";
 import { initializeAddress } from "./slices/addressSlice";
 import { initializeVendor } from "./slices/vendorSlice";
+import { ToastProvider } from "@/components/Toast";
 
 function ReduxInitializer({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -27,7 +28,9 @@ function ReduxInitializer({ children }: { children: React.ReactNode }) {
 export default function ReduxProvider({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
-      <ReduxInitializer>{children}</ReduxInitializer>
+      <ToastProvider>
+        <ReduxInitializer>{children}</ReduxInitializer>
+      </ToastProvider>
     </Provider>
   );
 }

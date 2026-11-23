@@ -19,6 +19,7 @@ import {
 } from "@/redux/slices/authSlice";
 import { setAddress } from "@/redux/slices/addressSlice";
 import { addToCart, openCart } from "@/redux/slices/cartSlice";
+import { useToast } from "@/components/Toast";
 import {
   User,
   ShoppingBag,
@@ -175,6 +176,7 @@ function ProfileTabContent({
   onRefresh: () => void;
 }) {
   const dispatch = useAppDispatch();
+  const { toast } = useToast();
 
   // ── Profile Form State (Initialized with real user data) ──
   const [fullName, setFullName] = useState(user?.name || "");
@@ -189,7 +191,9 @@ function ProfileTabContent({
   const handleAddPhone = async () => {
     const cleaned = newPhone.replace(/[\s-]/g, "");
     if (!/^\d{10}$/.test(cleaned)) {
-      setPhoneError("Enter a valid 10-digit mobile number (e.g. 9801234567).");
+      const errMsg = "Enter a valid 10-digit mobile number (e.g. 9801234567).";
+      setPhoneError(errMsg);
+      toast.error(errMsg, "Invalid Mobile Number");
       return;
     }
     setPhoneSaving(true);
@@ -197,7 +201,11 @@ function ProfileTabContent({
     const result = await dispatch(addPhoneNumber(cleaned));
     setPhoneSaving(false);
     if (addPhoneNumber.rejected.match(result)) {
-      setPhoneError((result.payload as string) || "Failed to save mobile number.");
+      const errMsg = (result.payload as string) || "Failed to save mobile number.";
+      setPhoneError(errMsg);
+      toast.error(errMsg, "Save Failed");
+    } else {
+      toast.success("Mobile number added and saved successfully!", "Phone Saved");
     }
   };
   const [dob, setDob] = useState(() => {
@@ -261,18 +269,24 @@ function ProfileTabContent({
     const targetEmail = newEmailInput.trim().toLowerCase();
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!targetEmail || !emailRegex.test(targetEmail)) {
-      setEmailOtpError("Please enter a valid email address.");
+      const errMsg = "Please enter a valid email address.";
+      setEmailOtpError(errMsg);
+      toast.error(errMsg, "Invalid Email");
       return;
     }
     if (targetEmail === email.toLowerCase().trim()) {
-      setEmailOtpError("The new email cannot be the same as your current email.");
+      const errMsg = "The new email cannot be the same as your current email.";
+      setEmailOtpError(errMsg);
+      toast.error(errMsg, "Invalid Email");
       return;
     }
 
     const activeToken =
       typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
     if (!activeToken) {
-      setEmailOtpError("Please log in to change your email address.");
+      const errMsg = "Please log in to change your email address.";
+      setEmailOtpError(errMsg);
+      toast.error(errMsg, "Authentication Required");
       return;
     }
 
@@ -288,17 +302,22 @@ function ProfileTabContent({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setEmailOtpSuccess(data.message || `Verification code sent to ${targetEmail}`);
+        const msg = data.message || `Verification code sent to ${targetEmail}`;
+        setEmailOtpSuccess(msg);
+        toast.info(msg, "Verification Code Sent");
         if (data.otpPreview) {
           setOtpPreviewCode(data.otpPreview);
         }
         setEmailStep("enter-otp");
         setOtpCountdown(60);
       } else {
-        setEmailOtpError(data.message || "Failed to send verification code. Please try again.");
+        const errMsg = data.message || "Failed to send verification code. Please try again.";
+        setEmailOtpError(errMsg);
+        toast.error(errMsg, "OTP Error");
       }
     } catch {
       setEmailOtpError("Network error. Please try again.");
+      toast.error("Network error. Please check your internet connection.", "Network Error");
     } finally {
       setIsSendingOtp(false);
     }
@@ -311,14 +330,18 @@ function ProfileTabContent({
     setEmailOtpSuccess(null);
 
     if (!otpInput || otpInput.trim().length < 4) {
-      setEmailOtpError("Please enter the complete 6-digit verification code.");
+      const errMsg = "Please enter the complete 6-digit verification code.";
+      setEmailOtpError(errMsg);
+      toast.error(errMsg, "Verification Code Incomplete");
       return;
     }
 
     const activeToken =
       typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null;
     if (!activeToken) {
-      setEmailOtpError("Please log in to continue.");
+      const errMsg = "Please log in to continue.";
+      setEmailOtpError(errMsg);
+      toast.error(errMsg, "Authentication Required");
       return;
     }
 
@@ -342,15 +365,19 @@ function ProfileTabContent({
         dispatch(updateLocalUser({ email: verifiedEmail, isEmailVerified: true }));
         setProfileSuccessMsg(`Email address successfully updated and verified to ${verifiedEmail}!`);
         setEmailOtpSuccess("Email verified successfully!");
+        toast.success(`Email address successfully updated to ${verifiedEmail}!`, "Email Verified & Updated");
         setTimeout(() => {
           setIsChangeEmailOpen(false);
           onRefresh();
         }, 1200);
       } else {
-        setEmailOtpError(data.message || "Invalid or expired verification code.");
+        const errMsg = data.message || "Invalid or expired verification code.";
+        setEmailOtpError(errMsg);
+        toast.error(errMsg, "Verification Failed");
       }
     } catch {
       setEmailOtpError("Network error verifying code. Please try again.");
+      toast.error("Network error verifying code. Please try again.", "Network Error");
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -364,16 +391,18 @@ function ProfileTabContent({
 
     const trimmedName = fullName.trim();
     if (!trimmedName) {
-      setProfileErrorMsg("Full name is required.");
+      const errMsg = "Full name is required.";
+      setProfileErrorMsg(errMsg);
+      toast.error(errMsg, "Name Required");
       return;
     }
 
     // [CEP-03] Validation: Alphabetical characters, spaces, hyphens and apostrophes only (2-50 chars)
     const nameRegex = /^[a-zA-Z\s'-]{2,50}$/;
     if (!nameRegex.test(trimmedName)) {
-      setProfileErrorMsg(
-        "Full name must contain only letters, spaces, hyphens, and apostrophes (minimum 2 characters, numbers and special symbols not allowed)."
-      );
+      const errMsg = "Full name must contain only letters, spaces, hyphens, and apostrophes (minimum 2 characters, numbers and special symbols not allowed).";
+      setProfileErrorMsg(errMsg);
+      toast.error(errMsg, "Invalid Name");
       return;
     }
 
@@ -391,17 +420,19 @@ function ProfileTabContent({
       );
 
       if (updateProfile.fulfilled.match(resultAction)) {
-        setProfileSuccessMsg("Profile information updated successfully!");
+        const successMsg = "Profile information updated successfully!";
+        setProfileSuccessMsg(successMsg);
+        toast.success(successMsg, "Profile Saved");
         setTimeout(() => setProfileSuccessMsg(null), 4000);
       } else {
-        setProfileErrorMsg(
-          (resultAction.payload as string) || "Failed to update profile. Please try again."
-        );
+        const errMsg = (resultAction.payload as string) || "Failed to update profile. Please try again.";
+        setProfileErrorMsg(errMsg);
+        toast.error(errMsg, "Update Failed");
       }
     } catch (err: unknown) {
-      setProfileErrorMsg(
-        err instanceof Error ? err.message : "An unexpected error occurred."
-      );
+      const errMsg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setProfileErrorMsg(errMsg);
+      toast.error(errMsg, "Update Error");
     } finally {
       setIsSavingProfile(false);
     }
@@ -414,15 +445,21 @@ function ProfileTabContent({
     setPasswordErrorMsg(null);
 
     if (!currentPassword) {
-      setPasswordErrorMsg("Please enter your current password.");
+      const errMsg = "Please enter your current password.";
+      setPasswordErrorMsg(errMsg);
+      toast.error(errMsg, "Password Required");
       return;
     }
     if (!newPassword || newPassword.length < 8) {
-      setPasswordErrorMsg("New password must be at least 8 characters long.");
+      const errMsg = "New password must be at least 8 characters long.";
+      setPasswordErrorMsg(errMsg);
+      toast.error(errMsg, "Weak Password");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordErrorMsg("Confirm password does not match new password.");
+      const errMsg = "Confirm password does not match new password.";
+      setPasswordErrorMsg(errMsg);
+      toast.error(errMsg, "Password Mismatch");
       return;
     }
 
@@ -437,21 +474,25 @@ function ProfileTabContent({
       );
 
       if (changeUserPassword.fulfilled.match(resultAction)) {
-        setPasswordSuccessMsg("Account password changed successfully!");
+        const successMsg = "Account password changed successfully!";
+        setPasswordSuccessMsg(successMsg);
+        toast.success(successMsg, "Password Changed");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setTimeout(() => setPasswordSuccessMsg(null), 5000);
       } else {
-        setPasswordErrorMsg(
+        const errMsg =
           (resultAction.payload as string) ||
-            "Failed to change password. Please verify your current password."
-        );
+          "Failed to change password. Please verify your current password.";
+        setPasswordErrorMsg(errMsg);
+        toast.error(errMsg, "Password Error");
       }
     } catch (err: unknown) {
-      setPasswordErrorMsg(
-        err instanceof Error ? err.message : "An unexpected error occurred."
-      );
+      const errMsg =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
+      setPasswordErrorMsg(errMsg);
+      toast.error(errMsg, "Password Error");
     } finally {
       setIsChangingPassword(false);
     }
@@ -953,6 +994,7 @@ function ProfileTabContent({
                   onClick={() => {
                     setAvatarUrl(url);
                     setIsAvatarModalOpen(false);
+                    toast.success("Profile avatar selected! Click 'Save Changes' below to apply.", "Avatar Selected");
                   }}
                   className={`p-1 rounded-2xl border-2 transition-all cursor-pointer ${
                     avatarUrl === url
@@ -988,6 +1030,7 @@ function ProfileTabContent({
                       setAvatarUrl(customAvatarInput.trim());
                       setCustomAvatarInput("");
                       setIsAvatarModalOpen(false);
+                      toast.success("Custom avatar image applied! Click 'Save Changes' below to apply.", "Avatar Selected");
                     }
                   }}
                   className="px-4 py-2 bg-[#0B4D58] hover:bg-[#083a42] text-white text-xs font-bold rounded-xl cursor-pointer"
@@ -1199,6 +1242,7 @@ function ProfileContent() {
   const activeTab = searchParams.get("tab") || "profile";
   const dispatch = useAppDispatch();
   const { user, token } = useAppSelector((state) => state.auth);
+  const { toast } = useToast();
 
 
   // ── 1. My Orders State ──
@@ -1316,13 +1360,15 @@ function ProfileContent() {
         )
       );
 
-      setCancelSuccessMsg(
-        `Order #${cancelModalOrder.orderNumber || cancelModalOrder._id.slice(-8).toUpperCase()} was cancelled successfully.`
-      );
+      const successCancelMsg = `Order #${cancelModalOrder.orderNumber || cancelModalOrder._id.slice(-8).toUpperCase()} was cancelled successfully.`;
+      setCancelSuccessMsg(successCancelMsg);
+      toast.success(successCancelMsg, "Order Cancelled");
       setCancelModalOrder(null);
       setTimeout(() => setCancelSuccessMsg(null), 5000);
     } catch (err: any) {
-      setCancelError(err?.message || "Failed to cancel order. Please try again.");
+      const errMsg = err?.message || "Failed to cancel order. Please try again.";
+      setCancelError(errMsg);
+      toast.error(errMsg, "Cancellation Failed");
     } finally {
       setCancelLoading(false);
     }
@@ -1479,7 +1525,7 @@ function ProfileContent() {
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAddr.addressLine.trim() || !newAddr.phone.trim()) {
-      alert("Please enter address details and a valid phone number.");
+      toast.error("Please enter complete address details and a valid phone number.", "Address Required");
       return;
     }
 
@@ -1509,6 +1555,7 @@ function ProfileContent() {
 
     setAddresses((prev) => [created, ...prev]);
     setIsAddAddressOpen(false);
+    toast.success("Delivery address added to your address book!", "Address Saved");
     setNewAddr({
       type: "Home",
       addressLine: "",
@@ -1532,6 +1579,7 @@ function ProfileContent() {
         } catch {}
       }
       setAddresses((prev) => prev.filter((a) => a._id !== addrId));
+      toast.success("Address removed from your address book.", "Address Deleted");
     }
   };
 
@@ -1551,6 +1599,7 @@ function ProfileContent() {
         isDefault: a._id === addrId,
       }))
     );
+    toast.success("Default delivery address updated!", "Default Address");
   };
 
   // ── Wishlist Actions ──
@@ -1564,6 +1613,7 @@ function ProfileContent() {
       } catch {}
     }
     setWishlist((prev) => prev.filter((item) => item.productId !== productId));
+    toast.info("Item removed from your wishlist.", "Wishlist Updated");
   };
 
   const handleAddWishlistToCart = (item: WishlistItem) => {
@@ -1576,6 +1626,7 @@ function ProfileContent() {
         images: item.image ? [{ url: item.image }] : undefined,
       })
     );
+    toast.success(`${item.name} added to cart!`, "Added to Cart");
     dispatch(openCart());
   };
 
@@ -1592,6 +1643,7 @@ function ProfileContent() {
         })
       );
     });
+    toast.success(`Items from order re-added to your cart!`, "Re-ordered");
     dispatch(openCart());
   };
 
@@ -1803,7 +1855,7 @@ function ProfileContent() {
             <div className="space-y-1">
               <button
                 type="button"
-                onClick={() => alert("BhansaMart Web App: Share with friends and family!")}
+                onClick={() => toast.info("Share BhansaMart with friends and family for fresh groceries delivered fast!", "Share BhansaMart")}
                 className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer text-left"
               >
                 <Share2 className="w-4 h-4" />
@@ -1813,7 +1865,7 @@ function ProfileContent() {
               <button
                 type="button"
                 onClick={() =>
-                  alert("Customer Support: Email support@bhansamart.com or Call 9868686868")
+                  toast.info("Customer Support: Email support@bhansamart.com or Call 9868686868", "Customer Support")
                 }
                 className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer text-left"
               >
@@ -1824,8 +1876,9 @@ function ProfileContent() {
               <button
                 type="button"
                 onClick={() =>
-                  alert(
-                    "BhansaMart: Simplifying Your Kitchen Needs. Delivering fresh groceries in 15-25 minutes."
+                  toast.info(
+                    "BhansaMart: Simplifying Your Kitchen Needs. Delivering fresh groceries in 15-25 minutes.",
+                    "About BhansaMart"
                   )
                 }
                 className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer text-left"
@@ -2353,7 +2406,7 @@ function ProfileContent() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => alert(`Shared address: ${addr.addressLine}`)}
+                          onClick={() => toast.info(`Address copied: ${addr.addressLine}`, "Address Shared")}
                           className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:border-slate-400 transition cursor-pointer"
                           title="Share address"
                         >
@@ -2373,7 +2426,7 @@ function ProfileContent() {
                               lng: addr.longitude || 85.324,
                             })
                           );
-                          alert(`Selected delivery address: ${addr.addressLine}`);
+                          toast.success(`Selected delivery address: ${addr.addressLine}`, "Delivery Address");
                         }}
                         className="text-xs font-bold text-[#2E7D32] hover:underline cursor-pointer"
                       >
@@ -2572,14 +2625,14 @@ function ProfileContent() {
           <div className="flex md:hidden flex-wrap items-center justify-between gap-3 pt-5 mt-6 border-t border-slate-100 text-xs font-semibold text-slate-600">
             <button
               type="button"
-              onClick={() => alert("BhansaMart: Simplifying Your Kitchen Needs.")}
+              onClick={() => toast.info("BhansaMart: Simplifying Your Kitchen Needs. Delivering fresh groceries in 15-25 minutes.", "About BhansaMart")}
               className="hover:text-slate-900 cursor-pointer"
             >
               About us
             </button>
             <button
               type="button"
-              onClick={() => alert("Support: Email support@bhansamart.com")}
+              onClick={() => toast.info("Support: Email support@bhansamart.com or Call 9868686868", "Customer Support")}
               className="hover:text-slate-900 cursor-pointer"
             >
               Help &amp; Support
