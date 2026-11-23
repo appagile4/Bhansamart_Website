@@ -20,6 +20,7 @@ import BrandRequestModal from "./BrandRequestModal";
 import AttributeModal from "./AttributeModal";
 import { Card, ErrorBanner, PageHeader, SuccessBanner, btn, field, fieldLabel } from "./ui";
 import { StorageFullHint } from "@/components/vendor/StorageWidgets";
+import DatePicker from "@/components/DatePicker";
 
 type Photo = { kind: "existing"; url: string } | { kind: "new"; file: File; preview: string };
 type StatusKey = "active" | "not_active" | "schedule";
@@ -396,10 +397,16 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
                       ))}
                     </datalist>
                   </label>
-                  <label className="block">
-                    <span className={fieldLabel}>Expiration date</span>
-                    <input type="date" className={field} value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} />
-                  </label>
+                  <div>
+                    <DatePicker
+                      label="Expiration date"
+                      value={expirationDate}
+                      onChange={(newVal) => setExpirationDate(newVal)}
+                      minDate={new Date().toISOString().split("T")[0]}
+                      placeholder="Select expiration date"
+                      accent="teal"
+                    />
+                  </div>
                 </div>
               </div>
             </Card>
