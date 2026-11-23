@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiUrl } from "@/lib/apiConfig";
-import {
-  ALL_CATEGORY_SECTIONS,
-  SectionCategoryData,
-} from "@/lib/constants/categories";
+import { SectionCategoryData } from "@/lib/constants/categories";
 
 interface BackendSubCategory {
   _id: string;
@@ -21,7 +18,7 @@ interface BackendCategory {
   subCategories?: BackendSubCategory[];
 }
 
-// Convert backend categories into the shape the website UI already uses
+// Convert backend categories into the shape the website UI uses
 function toSections(categories: BackendCategory[]): SectionCategoryData[] {
   return categories.map((cat) => ({
     id: cat.slug || cat._id,
@@ -59,32 +56,41 @@ export async function GET(req: NextRequest) {
           data: json.data,
         });
       }
-    } else {
-      console.warn(`[Categories API] Backend returned status ${res.status} from ${backendUrl}/categories`);
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: json?.message || "No categories found in database",
+          sections: [],
+          categories: [],
+          data: [],
+        },
+        { status: 404 }
+      );
     }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Backend categories API returned error: HTTP ${res.status}`,
+        sections: [],
+        categories: [],
+        data: [],
+      },
+      { status: res.status || 502 }
+    );
   } catch (err: unknown) {
-    console.error("[Categories API] Backend unreachable, falling back to static categories:", err instanceof Error ? err.message : err);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error("[Categories API Error]:", errorMsg);
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Backend categories service unavailable: ${errorMsg}`,
+        sections: [],
+        categories: [],
+        data: [],
+      },
+      { status: 503 }
+    );
   }
-
-  const fallbackData = ALL_CATEGORY_SECTIONS.map((sec) => ({
-    _id: sec.id,
-    name: sec.title,
-    slug: sec.id,
-    description: sec.badge || "",
-    image: sec.imageUrl || "",
-    subCategories: (sec.items || []).map((sub) => ({
-      _id: sub.id,
-      name: sub.name,
-      slug: sub.slug || sub.id,
-      image: sub.imageUrl || "",
-    })),
-  }));
-
-  return NextResponse.json({
-    success: true,
-    source: "fallback",
-    sections: ALL_CATEGORY_SECTIONS,
-    categories: fallbackData,
-    data: fallbackData,
-  });
 }

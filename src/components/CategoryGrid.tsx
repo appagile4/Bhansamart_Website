@@ -4,7 +4,7 @@ import React, { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { SectionCategoryData } from "@/lib/constants/categories";
 import { useCategorySections } from "@/lib/hooks/useCategorySections";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { Sparkles, ChevronDown, AlertCircle } from "lucide-react";
 
 export interface MainCategoryDisplayItem {
   id: string;
@@ -84,7 +84,7 @@ export default function CategoryGrid() {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
-  const { sections, loaded } = useCategorySections();
+  const { sections, loaded, error } = useCategorySections();
   const MAIN_CATEGORIES = useMemo(() => toMainCategories(sections), [sections]);
 
   // Open the main category; the category page lists all its subcategories
@@ -120,7 +120,7 @@ export default function CategoryGrid() {
   };
 
   // The first 8 are always visible, so the expander only matters beyond that
-  const showExpander = loaded && MAIN_CATEGORIES.length > 8;
+  const showExpander = loaded && !error && MAIN_CATEGORIES.length > 8;
 
   return (
     <section ref={sectionRef} className="w-full my-6 sm:my-8 scroll-mt-24">
@@ -161,6 +161,19 @@ export default function CategoryGrid() {
                 <div className="h-2.5 sm:h-3 w-3/4 bg-slate-200/70 rounded-md mx-auto mt-1" />
               </div>
             ))}
+          </div>
+        ) : error || MAIN_CATEGORIES.length === 0 ? (
+          /* ── Error State (No fallback categories shown) ── */
+          <div className="py-8 sm:py-10 px-4 flex flex-col items-center justify-center text-center">
+            <div className="w-11 h-11 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 mb-2.5">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <p className="text-sm sm:text-base font-bold text-slate-800 mb-1">
+              Unable to load categories
+            </p>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md">
+              {error || "Categories could not be retrieved from the server."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5 sm:gap-x-4 sm:gap-y-5">
