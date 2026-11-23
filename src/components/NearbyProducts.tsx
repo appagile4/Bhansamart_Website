@@ -123,9 +123,9 @@ export default function NearbyProducts() {
         <button
           type="button"
           onClick={() => dispatch(openAddressModal())}
-          className="self-start sm:self-auto px-3.5 sm:px-4 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 focus:outline-none shrink-0"
+          className="self-start sm:self-auto px-3.5 sm:px-4 py-1.5 sm:py-2 bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs sm:text-sm rounded-xl border border-emerald-200/90 transition cursor-pointer flex items-center gap-1.5 focus:outline-none shrink-0 shadow-2xs hover:shadow-xs"
         >
-          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+          <MapPin className="w-3.5 h-3.5 text-[#0C831F]" />
           <span>Change Location</span>
         </button>
       </div>

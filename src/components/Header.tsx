@@ -151,12 +151,15 @@ export default function Header({ onCartClick }: HeaderProps) {
             <button
               type="button"
               onClick={() => dispatch(openAddressModal())}
-              className="flex sm:hidden items-center gap-1.5 text-left bg-slate-50 hover:bg-slate-100 active:bg-slate-200 border border-slate-200/80 px-2 py-1 rounded-xl cursor-pointer min-w-0 max-w-[140px] xs:max-w-[170px] transition"
+              className="flex sm:hidden items-center gap-1.5 text-left bg-slate-50 hover:bg-slate-100 active:bg-slate-200 border border-slate-200/80 px-2.5 py-1 rounded-xl cursor-pointer min-w-0 max-w-[140px] xs:max-w-[170px] transition shadow-2xs"
               title="Change Delivery Location"
             >
-              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#0C831F]"></span>
+              </span>
               <div className="min-w-0 flex-1 truncate">
-                <span className="block text-[9px] font-black text-slate-800 uppercase tracking-tight leading-none truncate">
+                <span className="block text-[9px] font-black text-slate-900 uppercase tracking-tight leading-none truncate">
                   15-25 Mins
                 </span>
                 <span className="block text-[10px] text-slate-500 font-medium truncate leading-tight mt-0.5">
@@ -169,19 +172,23 @@ export default function Header({ onCartClick }: HeaderProps) {
             {/* Tablet & Desktop Location Selector (>= sm) */}
             <div
               onClick={() => dispatch(openAddressModal())}
-              className="hidden sm:flex flex-col text-left cursor-pointer select-none group border-l border-slate-200/80 pl-3 sm:pl-4 lg:pl-5 min-w-[160px] sm:min-w-[180px] lg:min-w-[190px] xl:min-w-[220px] max-w-[240px] xl:max-w-[270px]"
+              className="hidden sm:flex flex-col text-left cursor-pointer select-none group border-l border-slate-200/80 pl-3 sm:pl-4 lg:pl-5 min-w-[160px] sm:min-w-[180px] lg:min-w-[190px] xl:min-w-[220px] max-w-[240px] xl:max-w-[270px] hover:bg-slate-50/80 -my-1.5 py-1.5 pr-2 rounded-xl transition"
               title="Change Delivery Location"
             >
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0C831F]"></span>
+                </span>
                 <span className="font-extrabold text-xs sm:text-[13px] lg:text-sm text-slate-900 leading-tight">
-                  Delivery in 15-25 minutes
+                  Delivery in 15-25 mins
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-normal leading-tight mt-0.5 group-hover:text-slate-800 transition">
-                <span className="truncate max-w-[160px] sm:max-w-[190px] xl:max-w-[220px]">
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-normal leading-tight mt-0.5 group-hover:text-emerald-700 transition">
+                <span className="truncate max-w-[150px] sm:max-w-[180px] xl:max-w-[210px]">
                   {fullAddress}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-600 shrink-0 stroke-[2.5]" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-700 shrink-0 stroke-[2.5] transition-transform group-hover:translate-y-0.5" />
               </div>
             </div>
           </div>
