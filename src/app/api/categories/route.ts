@@ -5,6 +5,8 @@ import {
   SectionCategoryData,
 } from "@/lib/constants/categories";
 
+export const dynamic = "force-dynamic";
+
 interface BackendSubCategory {
   _id: string;
   name: string;
@@ -40,10 +42,11 @@ function toSections(categories: BackendCategory[]): SectionCategoryData[] {
 
 export async function GET() {
   try {
+    const backendUrl = getBackendApiUrl();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch(`${getBackendApiUrl()}/categories`, {
+    const res = await fetch(`${backendUrl}/categories`, {
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
@@ -61,9 +64,11 @@ export async function GET() {
           data: json.data,
         });
       }
+    } else {
+      console.warn(`[Categories API] Backend returned status ${res.status} from ${backendUrl}/categories`);
     }
-  } catch {
-    // Backend unreachable — fall through to the static list
+  } catch (err: unknown) {
+    console.error("[Categories API] Backend unreachable, falling back to static categories:", err instanceof Error ? err.message : err);
   }
 
   const fallbackData = ALL_CATEGORY_SECTIONS.map((sec) => ({

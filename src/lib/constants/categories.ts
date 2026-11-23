@@ -23,6 +23,22 @@ export interface SectionCategoryData {
 
 export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
   {
+    id: "paan-corner",
+    title: "Paan Corner",
+    badge: "Paan Corner essentials delivered in 15-25 minutes",
+    imageUrl: "/images/categories/paan-corner.png",
+    items: [
+      {
+        id: "lighter",
+        name: "Lighter",
+        slug: "lighter",
+        imageUrl:
+          "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmwCTsFRk-O5VHZzcm0FCrqeuLfBzkbkR-cYrxJq9Y9YGrHXMtgdwMrlfL&s=10",
+        categoryTitle: "Paan Corner",
+      },
+    ],
+  },
+  {
     id: "grocery-kitchen",
     title: "Grocery & Kitchen",
     badge: "Daily Staples",
@@ -404,6 +420,129 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
         imageUrl:
           "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&q=80",
       },
+    ],
+  },
+  {
+    id: "fruits-vegetables",
+    title: "Fruits & Vegetables",
+    badge: "Farm fresh organic fruits & green vegetables",
+    imageUrl: "/images/categories/fruits-vegetables.png",
+    items: [
+      { id: "fresh-vegetables", name: "Fresh Vegetables", slug: "fresh-vegetables", imageUrl: "/images/categories/fruits-vegetables.png" },
+      { id: "fresh-fruits", name: "Fresh Fruits", slug: "fresh-fruits", imageUrl: "/images/categories/fruits-vegetables.png" },
+    ],
+  },
+  {
+    id: "cold-drinks-juices",
+    title: "Cold Drinks & Juices",
+    badge: "Chilled soft drinks, sodas & fruit juices",
+    imageUrl: "/images/categories/cold-drinks-juices.png",
+    items: [
+      { id: "soft-drinks", name: "Soft Drinks", slug: "soft-drinks", imageUrl: "/images/categories/cold-drinks-juices.png" },
+      { id: "juices", name: "Fruit Juices", slug: "juices", imageUrl: "/images/categories/cold-drinks-juices.png" },
+    ],
+  },
+  {
+    id: "dairy-bread-eggs",
+    title: "Dairy, Bread & Eggs",
+    badge: "Fresh milk, bread, butter & eggs",
+    imageUrl: "/images/categories/dairy-bread-eggs.png",
+    items: [
+      { id: "milk", name: "Milk", slug: "milk", imageUrl: "/images/categories/dairy-bread-eggs.png" },
+      { id: "bread-pav", name: "Bread & Pav", slug: "bread-pav", imageUrl: "/images/categories/dairy-bread-eggs.png" },
+      { id: "eggs", name: "Eggs", slug: "eggs", imageUrl: "/images/categories/dairy-bread-eggs.png" },
+    ],
+  },
+  {
+    id: "snacks-munchies",
+    title: "Snacks & Munchies",
+    badge: "Chips, namkeen, wafers & party snacks",
+    imageUrl: "/images/categories/snacks-munchies.png",
+    items: [
+      { id: "chips-crisps", name: "Chips & Crisps", slug: "chips-crisps", imageUrl: "/images/categories/snacks-munchies.png" },
+      { id: "namkeen", name: "Namkeen", slug: "namkeen", imageUrl: "/images/categories/snacks-munchies.png" },
+    ],
+  },
+  {
+    id: "sweet-tooth",
+    title: "Sweet Tooth",
+    badge: "Chocolates, mithai, desserts & ice creams",
+    imageUrl: "/images/categories/sweet-tooth.png",
+    items: [
+      { id: "chocolates", name: "Chocolates", slug: "chocolates", imageUrl: "/images/categories/sweet-tooth.png" },
+      { id: "mithai", name: "Mithai", slug: "mithai", imageUrl: "/images/categories/sweet-tooth.png" },
+    ],
+  },
+  {
+    id: "bakery-biscuits",
+    title: "Bakery & Biscuits",
+    badge: "Cookies, rusks, cakes & artisan breads",
+    imageUrl: "/images/categories/bakery-biscuits.png",
+    items: [
+      { id: "cookies", name: "Cookies", slug: "cookies", imageUrl: "/images/categories/bakery-biscuits.png" },
+      { id: "cakes", name: "Cakes", slug: "cakes", imageUrl: "/images/categories/bakery-biscuits.png" },
+    ],
+  },
+  {
+    id: "tea-coffee-milk-drinks",
+    title: "Tea, Coffee & Milk Drinks",
+    badge: "Premium tea, coffee beans & health drinks",
+    imageUrl: "/images/categories/tea-coffee-milk-drinks.png",
+    items: [
+      { id: "tea", name: "Tea", slug: "tea", imageUrl: "/images/categories/tea-coffee-milk-drinks.png" },
+      { id: "coffee", name: "Coffee", slug: "coffee", imageUrl: "/images/categories/tea-coffee-milk-drinks.png" },
+    ],
+  },
+  {
+    id: "atta-rice-dal",
+    title: "Atta, Rice & Dal",
+    badge: "Grains, flours, pulses & daily essentials",
+    imageUrl: "/images/categories/atta-rice-dal.png",
+    items: [
+      { id: "atta", name: "Atta", slug: "atta", imageUrl: "/images/categories/atta-rice-dal.png" },
+      { id: "rice", name: "Rice", slug: "rice", imageUrl: "/images/categories/atta-rice-dal.png" },
+      { id: "dal-pulses", name: "Dal & Pulses", slug: "dal-pulses", imageUrl: "/images/categories/atta-rice-dal.png" },
+    ],
+  },
+  {
+    id: "masala-oil-more",
+    title: "Masala, Oil & More",
+    badge: "Cooking oils, pure ghee & aromatic spices",
+    imageUrl: "/images/categories/masala-oil-more.png",
+    items: [
+      { id: "edible-oils", name: "Edible Oils", slug: "edible-oils", imageUrl: "/images/categories/masala-oil-more.png" },
+      { id: "ghee", name: "Ghee", slug: "ghee", imageUrl: "/images/categories/masala-oil-more.png" },
+      { id: "spices-masalas", name: "Spices & Masalas", slug: "spices-masalas", imageUrl: "/images/categories/masala-oil-more.png" },
+    ],
+  },
+  {
+    id: "cleaning-essentials",
+    title: "Cleaning Essentials",
+    badge: "Detergents, floor cleaners & home hygiene",
+    imageUrl: "/images/categories/cleaning-essentials.png",
+    items: [
+      { id: "detergents", name: "Detergents", slug: "detergents", imageUrl: "/images/categories/cleaning-essentials.png" },
+      { id: "dishwash", name: "Dishwash", slug: "dishwash", imageUrl: "/images/categories/cleaning-essentials.png" },
+    ],
+  },
+  {
+    id: "personal-care",
+    title: "Personal Care",
+    badge: "Soaps, shampoos, skincare & grooming essentials",
+    imageUrl: "/images/categories/personal-care.png",
+    items: [
+      { id: "skin-care", name: "Skin Care", slug: "skin-care", imageUrl: "/images/categories/personal-care.png" },
+      { id: "hair-care", name: "Hair Care", slug: "hair-care", imageUrl: "/images/categories/personal-care.png" },
+    ],
+  },
+  {
+    id: "pet-care",
+    title: "Pet Care",
+    badge: "Pet food, treats, toys & grooming products",
+    imageUrl: "/images/categories/pet-care.png",
+    items: [
+      { id: "dog-food", name: "Dog Food", slug: "dog-food", imageUrl: "/images/categories/pet-care.png" },
+      { id: "cat-food", name: "Cat Food", slug: "cat-food", imageUrl: "/images/categories/pet-care.png" },
     ],
   },
 ];

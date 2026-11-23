@@ -3,7 +3,7 @@
  * Contains no hardcoded fallback URLs.
  */
 export function getBackendApiUrl(): string {
-  const url =
+  let url =
     process.env.BACKEND_API_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -14,5 +14,12 @@ export function getBackendApiUrl(): string {
     );
   }
 
-  return url.replace(/\/+$/, "");
+  url = url.replace(/\/+$/, "");
+
+  // Localhost safety guard: prevent SSL handshake errors if localhost is accidentally prefixed with https://
+  if (url.startsWith("https://localhost:") || url.startsWith("https://127.0.0.1:")) {
+    url = url.replace(/^https:\/\//, "http://");
+  }
+
+  return url;
 }

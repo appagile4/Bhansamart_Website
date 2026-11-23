@@ -21,6 +21,8 @@ const USEFUL_LINKS = [
 
 // ── Real Categories in 3 Columns from System Catalog ──
 const REAL_CATEGORIES_COL_1 = [
+  "Paan Corner",
+  "Lighter",
   "Vegetables & Fruits",
   "Atta, Rice & Dal",
   "Oil, Ghee & Masala",

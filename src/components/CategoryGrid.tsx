@@ -28,6 +28,28 @@ const FALLBACK_CATEGORY_IMAGES: Record<string, string> = {
   baby: "/images/categories/baby-care.png",
   "school-office-stationery": "/images/categories/home-office.png",
   gifting: "/images/categories/sweet-tooth.png",
+  "paan-corner": "/images/categories/paan-corner.png",
+  "fresh-vegetables": "/images/categories/fruits-vegetables.png",
+  "fruits-vegetables": "/images/categories/fruits-vegetables.png",
+  "cold-drinks-juices": "/images/categories/cold-drinks-juices.png",
+  "dairy-bread-eggs": "/images/categories/dairy-bread-eggs.png",
+  "dairy-and-eggs1": "/images/categories/dairy-bread-eggs.png",
+  "snacks-munchies": "/images/categories/snacks-munchies.png",
+  "breakfast-instant-food": "/images/categories/breakfast-instant-food.png",
+  "sweet-tooth": "/images/categories/sweet-tooth.png",
+  "bakery-biscuits": "/images/categories/bakery-biscuits.png",
+  "tea-coffee-milk-drinks": "/images/categories/tea-coffee-milk-drinks.png",
+  "atta-rice-dal": "/images/categories/atta-rice-dal.png",
+  "masala-oil-more": "/images/categories/masala-oil-more.png",
+  "sauces-spreads": "/images/categories/sauces-spreads.png",
+  "chicken-meat-fish": "/images/categories/chicken-meat-fish.png",
+  "organic-healthy-living": "/images/categories/organic-healthy-living.png",
+  "baby-care": "/images/categories/baby-care.png",
+  "pharma-wellness": "/images/categories/pharma-wellness.png",
+  "cleaning-essentials": "/images/categories/cleaning-essentials.png",
+  "home-office": "/images/categories/home-office.png",
+  "personal-care": "/images/categories/personal-care.png",
+  "pet-care": "/images/categories/pet-care.png",
 };
 
 // Map category sections into main category items for home page
@@ -35,8 +57,11 @@ const toMainCategories = (
   sections: SectionCategoryData[],
 ): MainCategoryDisplayItem[] =>
   sections.map((sec) => {
+    const slugKey = sec.id.toLowerCase();
+    const titleKey = sec.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const fallback =
-      FALLBACK_CATEGORY_IMAGES[sec.id] ||
+      FALLBACK_CATEGORY_IMAGES[slugKey] ||
+      FALLBACK_CATEGORY_IMAGES[titleKey] ||
       "/images/categories/fruits-vegetables.png";
     return {
       id: sec.id,
