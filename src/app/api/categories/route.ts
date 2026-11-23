@@ -1,11 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getBackendApiUrl } from "@/lib/apiConfig";
 import {
   ALL_CATEGORY_SECTIONS,
   SectionCategoryData,
 } from "@/lib/constants/categories";
-
-export const dynamic = "force-dynamic";
 
 interface BackendSubCategory {
   _id: string;
@@ -40,18 +38,15 @@ function toSections(categories: BackendCategory[]): SectionCategoryData[] {
   }));
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const backendUrl = getBackendApiUrl();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(`${backendUrl}/categories`, {
-      signal: controller.signal,
+      signal: AbortSignal.timeout(8000),
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
     });
-    clearTimeout(timeout);
 
     if (res.ok) {
       const json = await res.json();
