@@ -216,7 +216,7 @@ function SidebarFrame({
 
       <aside
         className={`bg-white border-r border-slate-100 flex flex-col z-50 h-screen select-none transition-all duration-300
-          fixed inset-y-0 left-0 w-72 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+          fixed inset-y-0 left-0 w-72 max-w-[85vw] lg:max-w-none ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
           lg:sticky lg:top-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-64"}`}
         aria-label="Seller navigation"
       >

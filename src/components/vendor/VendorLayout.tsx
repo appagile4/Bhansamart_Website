@@ -56,6 +56,23 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
     dispatch(fetchCodSummary());
   }, [authed, hasStoredToken, dispatch, router]);
 
+  // Mobile drawer: lock page scroll behind it, close on Escape, and close if the screen grows to desktop
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMobileOpen(false);
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onMq = () => mq.matches && setMobileOpen(false);
+    document.addEventListener("keydown", onKey);
+    mq.addEventListener("change", onMq);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+      mq.removeEventListener("change", onMq);
+    };
+  }, [mobileOpen]);
+
   // Pending / draft / rejected vendors may not use the dashboard — same rule as the app
   const { vendorProfile, vendorUser } = vendorState;
   const hasProfile = Boolean(vendorProfile || vendorUser);
@@ -91,13 +108,16 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
           }}
         />
 
-        <main className="flex-1 w-full p-4 md:p-6 lg:p-8">
-          {authed && (
-            <React.Suspense fallback={null}>
-              <StorageAlertBanner />
-            </React.Suspense>
-          )}
-          {children}
+        <main className="flex-1 w-full min-w-0 px-3 py-4 sm:p-4 md:p-6 lg:p-8">
+          {/* Caps line length on very wide screens so cards and tables don't stretch edge to edge */}
+          <div className="mx-auto w-full max-w-[1600px] min-w-0">
+            {authed && (
+              <React.Suspense fallback={null}>
+                <StorageAlertBanner />
+              </React.Suspense>
+            )}
+            {children}
+          </div>
         </main>
       </div>
 

@@ -15,8 +15,8 @@ export default function Home() {
       {/* ── 1. Header Component (90% width with BhansaMart Logo, Redux Auth & Location) ── */}
       <Header />
 
-      {/* ── 2. Main Page Content (70% width) ── */}
-      <main className="flex-1 w-[70%] mx-auto pb-16">
+      {/* ── 2. Main Page Content (Responsive width from mobile to 2xl desktop) ── */}
+      <main className="flex-1 w-[94%] sm:w-[92%] md:w-[90%] lg:w-[85%] xl:w-[75%] 2xl:w-[70%] max-w-7xl mx-auto pb-12 sm:pb-16">
         {/* ── Hero Banner with BhansaMart Fresh Groceries Delivered Fast ── */}
         <HeroBanner />
 

@@ -13,8 +13,8 @@ export default function HeroBanner({
   altText = "BhansaMart Fresh Groceries Delivered Fast",
 }: HeroBannerProps) {
   return (
-    <section className="w-full my-6 sm:my-8" aria-label="Hero Promotional Banner">
-      <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-md transition-shadow duration-300 border border-slate-200/70 bg-white">
+    <section className="w-full my-4 sm:my-6 md:my-8" aria-label="Hero Promotional Banner">
+      <div className="relative w-full overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl shadow-sm hover:shadow-md transition-shadow duration-300 border border-slate-200/70 bg-white">
         <Link
           href={href}
           className="block relative w-full group cursor-pointer focus:outline-none"

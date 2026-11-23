@@ -63,6 +63,36 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+// Async thunk for Google Sign-In (sign in or sign up with a Google ID token)
+export const googleLogin = createAsyncThunk(
+  "auth/googleLogin",
+  async (payload: { idToken: string; referralCode?: string }, { rejectWithValue }) => {
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Google sign-in failed");
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bhansa_token", data.data.token);
+        localStorage.setItem("bhansa_user", JSON.stringify(data.data.user));
+      }
+
+      return data.data as { user: UserProfile; token: string; isNewUser?: boolean };
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error during Google sign-in"
+      );
+    }
+  }
+);
+
 // Async thunk for registering
 export const registerUser = createAsyncThunk(
   "auth/registerUser",
@@ -158,6 +188,7 @@ export const updateProfile = createAsyncThunk(
       name?: string;
       gender?: string;
       dateOfBirth?: string;
+      dob?: string;
       address?: string;
       phone?: string;
       avatar?: string;
@@ -206,6 +237,45 @@ export const updateProfile = createAsyncThunk(
     } catch (err: unknown) {
       return rejectWithValue(
         err instanceof Error ? err.message : "Network error updating profile"
+      );
+    }
+  }
+);
+
+// Async thunk to add a mobile number once (backend only allows it while the phone is empty)
+export const addPhoneNumber = createAsyncThunk(
+  "auth/addPhoneNumber",
+  async (phone: string, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const token =
+        state.auth.token ||
+        (typeof window !== "undefined" ? localStorage.getItem("bhansa_token") : null);
+      if (!token) return rejectWithValue("Authentication required. Please login.");
+
+      const res = await fetch("/api/auth/profile/phone", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || data.errors?.[0] || "Failed to save mobile number");
+      }
+
+      const savedPhone: string = data.data?.user?.phone || phone;
+      const updatedUser: UserProfile = {
+        ...(state.auth.user || ({} as UserProfile)),
+        phone: savedPhone,
+      };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bhansa_user", JSON.stringify(updatedUser));
+      }
+      return updatedUser;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error saving mobile number"
       );
     }
   }
@@ -318,6 +388,26 @@ export const authSlice = createSlice({
         state.error = (action.payload as string) || "Login failed";
       });
 
+    // Google Sign-In
+    builder
+      .addCase(googleLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.successMessage = action.payload.isNewUser
+          ? "Account created with Google"
+          : "Logged in successfully";
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Google sign-in failed";
+      });
+
     // Register
     builder
       .addCase(registerUser.pending, (state) => {
@@ -373,6 +463,11 @@ export const authSlice = createSlice({
         state.loading = false;
         state.error = (action.payload as string) || "Failed to update profile";
       });
+
+    // Add phone (one-time). Errors are shown by the profile page itself, so no global error here.
+    builder.addCase(addPhoneNumber.fulfilled, (state, action) => {
+      state.user = action.payload;
+    });
 
     // Change Password
     builder

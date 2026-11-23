@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 import * as api from "@/lib/seller/api";
-import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
 import { Modal, btn, field, fieldLabel } from "./ui";
 
 const TYPES = [
@@ -18,11 +17,13 @@ export default function AttributeModal({
   onClose,
   onSubmitted,
   defaultCategory,
+  availableCategories,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmitted: (message: string) => void;
   defaultCategory?: string;
+  availableCategories?: string[];
 }) {
   const [name, setName] = useState("");
   const [valueInput, setValueInput] = useState("");
@@ -144,21 +145,29 @@ export default function AttributeModal({
 
         <div>
           <span className={fieldLabel}>Applies to categories</span>
-          <div className="flex flex-wrap gap-2">
-            {MAIN_CATEGORY_NAMES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategories((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]))}
-                aria-pressed={categories.includes(c)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer ${
-                  categories.includes(c) ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-300 text-slate-600"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          {!availableCategories?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-7 w-24 rounded-full bg-slate-200/70 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {availableCategories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategories((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]))}
+                  aria-pressed={categories.includes(c)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition ${
+                    categories.includes(c) ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && <p className="text-xs font-medium text-red-600">{error}</p>}

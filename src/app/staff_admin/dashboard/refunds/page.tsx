@@ -172,11 +172,11 @@ export default function StaffRefundsPage() {
         </div>
 
         {/* Filter Bar & Search */}
-        <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-1">
+        <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-1 min-w-0">
           <Tabs tabs={FILTERS} active={status} onChange={setStatus} counts={tabCounts} />
 
-          <div className="flex items-center gap-2 flex-1 md:max-w-md">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-0 md:max-w-md">
+            <div className="relative flex-1 min-w-0">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 className={`${field} pl-9 pr-8 text-xs h-10`}
@@ -198,7 +198,7 @@ export default function StaffRefundsPage() {
 
             {storesQ.data?.data && storesQ.data.data.length > 0 && (
               <select
-                className={`${field} text-xs h-10 w-44 shrink-0`}
+                className={`${field} text-xs h-10 sm:w-44 sm:shrink-0 truncate`}
                 value={vendorFilter}
                 onChange={(e) => setVendorFilter(e.target.value)}
               >

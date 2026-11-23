@@ -333,7 +333,7 @@ function FinStat({ label, labelColor, value, valueColor, href }: { label: string
   const body = (
     <div className="h-full rounded-xl border border-[#A7F3D0] bg-white/65 px-3 py-2.5">
       <p className="text-[11px] font-semibold" style={{ color: labelColor }}>{label}</p>
-      <p className="text-base font-extrabold mt-0.5 truncate" style={{ color: valueColor }}>{value}</p>
+      <p className="text-base font-extrabold mt-0.5 break-words leading-tight" style={{ color: valueColor }}>{value}</p>
     </div>
   );
   return href ? <Link href={href} className="block hover:brightness-[0.98]">{body}</Link> : body;
@@ -366,7 +366,7 @@ function Kpi({
           <Icon className="w-[18px] h-[18px]" style={{ color: iconColor }} />
         </span>
       </span>
-      <span className="block mt-1 text-xl font-extrabold truncate" style={{ color: valueColor }}>{value}</span>
+      <span className="block mt-1 text-lg sm:text-xl font-extrabold break-words leading-tight" style={{ color: valueColor }}>{value}</span>
       <span className="block mt-1 text-[11px]">{children}</span>
     </Link>
   );

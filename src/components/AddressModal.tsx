@@ -5,53 +5,15 @@ import { Navigation, Search, X, Check, Store, MapPin } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { setAddress, closeAddressModal } from "@/redux/slices/addressSlice";
 
-export interface AddressLocation {
-  name: string;
-  addressLine: string;
-  city: string;
-  lat: number;
-  lng: number;
-  nearbyStoresCount?: number;
-}
-
-export const PRESET_HUBS: AddressLocation[] = [
-  {
-    name: "Dwarka Sector 5 Hub",
-    addressLine: "Plato 19, Dwarka Sector 5, New Delhi",
-    city: "New Delhi",
-    lat: 28.5921,
-    lng: 77.046,
-    nearbyStoresCount: 4,
-  },
-  {
-    name: "Rohini Sector 24 Hub",
-    addressLine: "Pocket 24, Rohini Sector 24, Delhi",
-    city: "Delhi",
-    lat: 28.7212,
-    lng: 77.1038,
-    nearbyStoresCount: 3,
-  },
-  {
-    name: "Kathmandu Valley Hub",
-    addressLine: "Kathmandu Central, Bagmati Province, Nepal",
-    city: "Kathmandu",
-    lat: 27.7172,
-    lng: 85.324,
-    nearbyStoresCount: 11,
-  },
-  {
-    name: "Ganga Nagar Hub",
-    addressLine: "Main Market, Ganga Nagar, Meerut",
-    city: "Meerut",
-    lat: 28.9845,
-    lng: 77.7064,
-    nearbyStoresCount: 1,
-  },
-];
+import { AddressLocation, PRESET_HUBS } from "@/lib/addressHubs";
+export type { AddressLocation };
+export { PRESET_HUBS };
 
 export default function AddressModal() {
   const dispatch = useAppDispatch();
-  const { currentAddress, isModalOpen } = useAppSelector((state) => state.address);
+  const { currentAddress, isModalOpen } = useAppSelector(
+    (state) => state.address,
+  );
 
   const [searchTerm, setSearchTerm] = useState("");
   const [detecting, setDetecting] = useState(false);
@@ -79,7 +41,9 @@ export default function AddressModal() {
         const lng = position.coords.longitude;
 
         try {
-          const res = await fetch(`/api/address/reverse-geocode?lat=${lat}&lng=${lng}`);
+          const res = await fetch(
+            `/api/address/reverse-geocode?lat=${lat}&lng=${lng}`,
+          );
           const data = await res.json();
           if (data && data.success && data.addressLine) {
             dispatch(
@@ -89,7 +53,7 @@ export default function AddressModal() {
                 city: data.city || "Delhi",
                 lat,
                 lng,
-              })
+              }),
             );
           } else {
             dispatch(
@@ -99,7 +63,7 @@ export default function AddressModal() {
                 city: "New Delhi",
                 lat,
                 lng,
-              })
+              }),
             );
           }
         } catch {
@@ -110,7 +74,7 @@ export default function AddressModal() {
               city: "New Delhi",
               lat,
               lng,
-            })
+            }),
           );
         } finally {
           setDetecting(false);
@@ -120,9 +84,11 @@ export default function AddressModal() {
       (err) => {
         setDetecting(false);
         console.warn("Geolocation error:", err);
-        setErrorMsg("Unable to retrieve your current location. Please select a delivery address below.");
+        setErrorMsg(
+          "Unable to retrieve your current location. Please select a delivery address below.",
+        );
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 10000, enableHighAccuracy: true },
     );
   };
 
@@ -130,19 +96,21 @@ export default function AddressModal() {
     (h) =>
       h.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       h.addressLine.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.city.toLowerCase().includes(searchTerm.toLowerCase())
+      h.city.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
-        
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl sm:rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[92vh] sm:max-h-[90vh]">
         {/* ── Modal Header ── */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Change Delivery Location</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Select your address to view nearby stores & instant delivery products
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              Change Delivery Location
+            </h2>
+            <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5">
+              Select your address to view nearby stores & instant delivery
+              products
             </p>
           </div>
           <button
@@ -155,8 +123,7 @@ export default function AddressModal() {
         </div>
 
         {/* ── Modal Body ── */}
-        <div className="p-6 overflow-y-auto space-y-4">
-          
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 sm:space-y-4">
           {/* 1. Detect Current Location Button */}
           <button
             type="button"
@@ -166,13 +133,17 @@ export default function AddressModal() {
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-[#0C831F] text-white flex items-center justify-center shadow-xs">
-                <Navigation className={`w-4 h-4 ${detecting ? "animate-spin" : ""}`} />
+                <Navigation
+                  className={`w-4 h-4 ${detecting ? "animate-spin" : ""}`}
+                />
               </div>
               <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-900 block group-hover:text-emerald-900">
-                  {detecting ? "Detecting your street address..." : "Use My Current Location"}
+                <span className="text-xs sm:text-sm md:text-base font-bold text-slate-900 block group-hover:text-emerald-900">
+                  {detecting
+                    ? "Detecting your street address..."
+                    : "Use My Current Location"}
                 </span>
-                <span className="text-[11px] text-slate-500">
+                <span className="text-[11px] sm:text-xs text-slate-500">
                   Deliver to your current location address
                 </span>
               </div>
@@ -183,7 +154,9 @@ export default function AddressModal() {
           </button>
 
           {errorMsg ? (
-            <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded-lg">{errorMsg}</p>
+            <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded-lg">
+              {errorMsg}
+            </p>
           ) : null}
 
           {/* 2. Search Input */}
@@ -207,7 +180,8 @@ export default function AddressModal() {
             <div className="space-y-2">
               {filteredHubs.map((hub) => {
                 const isSelected =
-                  currentAddress.lat === hub.lat && currentAddress.lng === hub.lng;
+                  currentAddress.lat === hub.lat &&
+                  currentAddress.lng === hub.lng;
 
                 return (
                   <div
@@ -238,13 +212,13 @@ export default function AddressModal() {
                             {hub.name}
                           </span>
                           {hub.nearbyStoresCount ? (
-                            <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="text-[10px] sm:text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                               <Store className="w-2.5 h-2.5" />
                               {hub.nearbyStoresCount} Stores
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                        <p className="text-xs sm:text-sm text-slate-500 mt-0.5 line-clamp-1">
                           {hub.addressLine}
                         </p>
                       </div>
@@ -263,7 +237,8 @@ export default function AddressModal() {
         {/* ── Modal Footer ── */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-500">
-            Products shown are fetched from approved vendors operating inside your delivery radius.
+            Products shown are fetched from approved vendors operating inside
+            your delivery radius.
           </p>
         </div>
       </div>

@@ -97,7 +97,7 @@ function ForgotPasswordContent() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-center items-center py-10 px-4 sm:px-6 font-sans">
+    <div className="min-h-screen bg-white flex flex-col justify-center items-center py-6 sm:py-10 px-4 sm:px-6 font-sans">
       <div className="w-full max-w-[420px] mx-auto flex flex-col items-center">
         {/* ── BhansaMart Cart Logo ── */}
         <Link href="/" className="mb-6 focus:outline-none" title="BhansaMart Home">
@@ -109,12 +109,12 @@ function ForgotPasswordContent() {
         </Link>
 
         {/* ── Change Password Title (Matching Image 4) ── */}
-        <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight text-center mb-2">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight text-center mb-2">
           Change Password
         </h1>
 
         {/* ── Subtitle (Matching Image 4) ── */}
-        <p className="text-xs text-slate-600 text-center mb-8 px-4 leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-600 text-center mb-8 px-4 leading-relaxed">
           {hasSentEmail
             ? `We sent an email to ${email} with a link to change your password`
             : "Enter your registered email address to receive password change instructions"}
@@ -139,7 +139,7 @@ function ForgotPasswordContent() {
         {!hasSentEmail ? (
           <form onSubmit={handleSendResetEmail} className="w-full space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
                 Email address
               </label>
               <input
@@ -155,7 +155,7 @@ function ForgotPasswordContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-[#0B4D58] hover:bg-[#083C45] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none"
+              className="w-full py-3.5 bg-[#0B4D58] hover:bg-[#083C45] text-white font-bold text-xs sm:text-sm md:text-base rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none"
             >
               {loading ? "Sending..." : "Send Reset Link"}
             </button>

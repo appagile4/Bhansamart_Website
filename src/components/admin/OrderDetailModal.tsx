@@ -198,8 +198,8 @@ function Facts({ rows }: { rows: Array<[string, string | undefined | null]> }) {
         .filter(([, v]) => v)
         .map(([k, v]) => (
           <div key={k} className="flex justify-between gap-2 text-xs">
-            <dt className="text-slate-500">{k}</dt>
-            <dd className="font-semibold text-slate-800 text-right break-all">{v}</dd>
+            <dt className="text-slate-500 shrink-0">{k}</dt>
+            <dd className="font-semibold text-slate-800 text-right break-words [overflow-wrap:anywhere] min-w-0">{v}</dd>
           </div>
         ))}
     </dl>

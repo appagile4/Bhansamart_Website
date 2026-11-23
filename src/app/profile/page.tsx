@@ -14,6 +14,7 @@ import {
   changeUserPassword,
   fetchCurrentUser,
   updateLocalUser,
+  addPhoneNumber,
   UserProfile,
 } from "@/redux/slices/authSlice";
 import { setAddress } from "@/redux/slices/addressSlice";
@@ -179,8 +180,26 @@ function ProfileTabContent({
   const [fullName, setFullName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "customer@bhansamart.com");
   const [gender, setGender] = useState(user?.gender || "Other");
-  // Mobile number: permanently non-changeable as per requirements
-  const phone = user?.phone || "9868686868";
+  // Mobile number: can be added once (while empty), then permanently non-changeable
+  const phone = user?.phone || "";
+  const [newPhone, setNewPhone] = useState("");
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const handleAddPhone = async () => {
+    const cleaned = newPhone.replace(/[\s-]/g, "");
+    if (!/^\d{10}$/.test(cleaned)) {
+      setPhoneError("Enter a valid 10-digit mobile number (e.g. 9801234567).");
+      return;
+    }
+    setPhoneSaving(true);
+    setPhoneError(null);
+    const result = await dispatch(addPhoneNumber(cleaned));
+    setPhoneSaving(false);
+    if (addPhoneNumber.rejected.match(result)) {
+      setPhoneError((result.payload as string) || "Failed to save mobile number.");
+    }
+  };
   const [dob, setDob] = useState(() => {
     if (user?.dateOfBirth) {
       try {
@@ -343,8 +362,18 @@ function ProfileTabContent({
     setProfileSuccessMsg(null);
     setProfileErrorMsg(null);
 
-    if (!fullName.trim()) {
+    const trimmedName = fullName.trim();
+    if (!trimmedName) {
       setProfileErrorMsg("Full name is required.");
+      return;
+    }
+
+    // [CEP-03] Validation: Alphabetical characters, spaces, hyphens and apostrophes only (2-50 chars)
+    const nameRegex = /^[a-zA-Z\s'-]{2,50}$/;
+    if (!nameRegex.test(trimmedName)) {
+      setProfileErrorMsg(
+        "Full name must contain only letters, spaces, hyphens, and apostrophes (minimum 2 characters, numbers and special symbols not allowed)."
+      );
       return;
     }
 
@@ -352,9 +381,10 @@ function ProfileTabContent({
     try {
       const resultAction = await dispatch(
         updateProfile({
-          name: fullName.trim(),
+          name: trimmedName,
           gender,
           dateOfBirth: dob || undefined,
+          dob: dob || undefined,
           address: addressLine.trim() || undefined,
           avatar: avatarUrl,
         })
@@ -431,10 +461,10 @@ function ProfileTabContent({
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Header Title */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
           My Profile
         </h2>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Manage your account credentials and personal preferences
         </p>
       </div>
@@ -462,7 +492,7 @@ function ProfileTabContent({
 
         <div className="flex-1 text-center sm:text-left space-y-1.5">
           <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+            <h3 className="text-base sm:text-lg md:text-xl font-bold text-slate-900">
               {fullName || "Customer Account"}
             </h3>
             <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -592,32 +622,82 @@ function ProfileTabContent({
             </p>
           </div>
 
-          {/* Mobile Number (mobile number - non-changeable) */}
+          {/* Mobile Number: add once if missing, then non-changeable */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700">
                 Mobile Number
               </label>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                <Lock className="w-2.5 h-2.5 text-slate-400" />
-                Non-changeable
-              </span>
+              {phone ? (
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-slate-400" />
+                  Non-changeable
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                  Not added
+                </span>
+              )}
             </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Phone className="w-4 h-4" />
-              </div>
-              <input
-                type="tel"
-                value={phone}
-                readOnly
-                title="Mobile number is permanently bound to this account and cannot be modified."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-600 cursor-not-allowed select-text font-medium"
-              />
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Mobile number is permanently bound to this account for security.
-            </p>
+            {phone ? (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    readOnly
+                    title="Mobile number is permanently bound to this account and cannot be modified."
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-600 cursor-not-allowed select-text font-medium"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Mobile number is permanently bound to this account for security.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={12}
+                      value={newPhone}
+                      onChange={(e) => {
+                        setNewPhone(e.target.value.replace(/[^\d\s-]/g, ""));
+                        setPhoneError(null);
+                      }}
+                      placeholder="Add your mobile number"
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B4D58]/20 focus:border-[#0B4D58]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddPhone}
+                    disabled={phoneSaving || !newPhone.trim()}
+                    className="px-4 py-2.5 bg-[#0B4D58] hover:bg-[#083C45] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                  >
+                    {phoneSaving && (
+                      <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    Save
+                  </button>
+                </div>
+                {phoneError ? (
+                  <p className="text-[10px] text-red-500 mt-1">{phoneError}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Used by delivery partners to reach you. It can&apos;t be changed after saving, so double-check it.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Date of Birth (dob) */}
@@ -1249,36 +1329,7 @@ function ProfileContent() {
   };
 
   // ── 2. My Address Book State ──
-  const [addresses, setAddresses] = useState<SavedAddress[]>([
-    {
-      _id: "addr1",
-      type: "Home",
-      addressLine: "Floor 5, Building name, land mark, Baneshwor, kathmandu",
-      city: "Kathmandu",
-      phone: "9868686868",
-      isDefault: true,
-      latitude: 27.7172,
-      longitude: 85.324,
-    },
-    {
-      _id: "addr2",
-      type: "Home",
-      addressLine: "Plato 19, Dwarka Sector 5, New Delhi",
-      city: "New Delhi",
-      phone: "9812345678",
-      latitude: 28.5921,
-      longitude: 77.046,
-    },
-    {
-      _id: "addr3",
-      type: "Work",
-      addressLine: "Pocket 24, Rohini Sector 24, Delhi",
-      city: "Delhi",
-      phone: "9876543210",
-      latitude: 28.7212,
-      longitude: 77.1038,
-    },
-  ]);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
 
   const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
   const [newAddr, setNewAddr] = useState({
@@ -1378,8 +1429,7 @@ function ProfileContent() {
         if (
           addrRes.status === "fulfilled" &&
           addrRes.value?.success &&
-          Array.isArray(addrRes.value.data) &&
-          addrRes.value.data.length > 0
+          Array.isArray(addrRes.value.data)
         ) {
           setAddresses(addrRes.value.data);
         }
@@ -1550,9 +1600,93 @@ function ProfileContent() {
       <Header />
 
       {/* ── Main Container ── */}
-      <main className="flex-1 w-[90%] lg:w-[85%] mx-auto py-8 flex flex-col md:flex-row gap-8 items-start">
-        {/* ── Left Sidebar Navigation (Matching Image 5) ── */}
-        <aside className="w-full md:w-64 lg:w-72 bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs shrink-0">
+      <main className="flex-1 w-[94%] sm:w-[90%] lg:w-[85%] max-w-7xl mx-auto py-4 sm:py-8 flex flex-col md:flex-row gap-5 sm:gap-8 items-start">
+        
+        {/* ── Mobile Horizontal Tab Navigation (< md) ── */}
+        <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-2 w-full no-scrollbar touch-pan-x select-none">
+          <button
+            type="button"
+            onClick={() => router.push("/profile?tab=profile", { scroll: false })}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              activeTab === "profile"
+                ? "bg-[#0C831F] text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200"
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>My Profile</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/profile?tab=orders", { scroll: false })}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              activeTab === "orders"
+                ? "bg-[#0C831F] text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200"
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>Orders</span>
+            {orders.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === "orders" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
+                {orders.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/profile?tab=address", { scroll: false })}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              activeTab === "address" || activeTab === "address-book"
+                ? "bg-[#0C831F] text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200"
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Address Book</span>
+            {addresses.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === "address" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
+                {addresses.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/profile?tab=wishlist", { scroll: false })}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              activeTab === "wishlist"
+                ? "bg-[#0C831F] text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200"
+            }`}
+          >
+            <Heart className="w-3.5 h-3.5" />
+            <span>Wishlist</span>
+            {wishlist.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === "wishlist" ? "bg-white/20 text-white" : "bg-rose-50 text-rose-700"}`}>
+                {wishlist.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/profile?tab=reviews", { scroll: false })}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              activeTab === "reviews"
+                ? "bg-[#0C831F] text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200"
+            }`}
+          >
+            <Star className="w-3.5 h-3.5" />
+            <span>Reviews</span>
+          </button>
+        </div>
+
+        {/* ── Left Sidebar Navigation (Desktop only: md:block) ── */}
+        <aside className="hidden md:block w-64 lg:w-72 bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs shrink-0">
           {/* Group 1: YOUR INFORMATION */}
           <div className="mb-6">
             <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase block mb-2 px-3">
@@ -1713,7 +1847,7 @@ function ProfileContent() {
         </aside>
 
         {/* ── Right Content Area ── */}
-        <section className="flex-1 w-full bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs min-h-[500px]">
+        <section className="flex-1 w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-6 lg:p-8 shadow-xs min-h-[500px] min-w-0">
           {/* Guest Mode Notice if unauthenticated */}
           {!token && !user && (
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1750,10 +1884,10 @@ function ProfileContent() {
             <div className="space-y-6 animate-in fade-in duration-200">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                     My Orders
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
                     Track live deliveries and view previous order invoices
                   </p>
                 </div>
@@ -2142,10 +2276,10 @@ function ProfileContent() {
               {/* Header Row (Matching Image 5) */}
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                     Address Book
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
                     Your saved addresses
                   </p>
                 </div>
@@ -2158,6 +2292,12 @@ function ProfileContent() {
                   <span>Add new address</span>
                 </button>
               </div>
+
+              {addresses.length === 0 && (
+                <div className="border border-dashed border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
+                  No saved addresses yet. Use &ldquo;Add new address&rdquo; to save one for faster checkout.
+                </div>
+              )}
 
               {/* Address Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2253,11 +2393,11 @@ function ProfileContent() {
             <div className="space-y-6 animate-in fade-in duration-200">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                     <span>My Wishlist</span>
                     <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
                     Your saved items and favorite grocery products
                   </p>
                 </div>
@@ -2357,10 +2497,10 @@ function ProfileContent() {
           {activeTab === "reviews" && (
             <div className="space-y-6 animate-in fade-in duration-200">
               <div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                   My Reviews
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
                   Product reviews and ratings you have shared with the BhansaMart community
                 </p>
               </div>
@@ -2427,6 +2567,31 @@ function ProfileContent() {
               )}
             </div>
           )}
+
+          {/* Mobile Secondary Action Strip (< md) */}
+          <div className="flex md:hidden flex-wrap items-center justify-between gap-3 pt-5 mt-6 border-t border-slate-100 text-xs font-semibold text-slate-600">
+            <button
+              type="button"
+              onClick={() => alert("BhansaMart: Simplifying Your Kitchen Needs.")}
+              className="hover:text-slate-900 cursor-pointer"
+            >
+              About us
+            </button>
+            <button
+              type="button"
+              onClick={() => alert("Support: Email support@bhansamart.com")}
+              className="hover:text-slate-900 cursor-pointer"
+            >
+              Help &amp; Support
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-rose-600 font-bold hover:underline cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
         </section>
       </main>
 

@@ -293,6 +293,43 @@ export const clearCart = createAsyncThunk(
   }
 );
 
+/**
+ * Clear specific vendor items from cart after single-vendor order placement
+ */
+export const clearVendorCart = createAsyncThunk(
+  "cart/clearVendorCart",
+  async (productIds: string[], { dispatch, getState }) => {
+    dispatch(cartSlice.actions.removeVendorItemsLocal(productIds));
+    const token = getAuthToken();
+    if (token) {
+      try {
+        const state = getState() as { cart: CartState };
+        const itemsToSync = Object.values(state.cart.items).map((item) => ({
+          productId: item.product._id,
+          name: item.product.name,
+          price: item.product.price,
+          originalPrice: item.product.originalPrice || item.product.price,
+          quantity: item.quantity,
+          imageUrl: getProductImageUrl(item.product),
+          weight: item.product.unit || "1 unit",
+          category: item.product.category || "",
+          subCategory: item.product.subCategory || "",
+        }));
+        await fetch("/api/cart/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ items: itemsToSync }),
+        });
+      } catch (err) {
+        console.warn("Could not sync clearVendorCart to server:", err);
+      }
+    }
+  }
+);
+
 export const cartSlice = createSlice({
   name: "cart",
   initialState,
@@ -369,6 +406,21 @@ export const cartSlice = createSlice({
       state.totalCount = 0;
       state.totalPrice = 0;
       saveCartToStorage({});
+    },
+    removeVendorItemsLocal: (state, action: PayloadAction<string[]>) => {
+      const idsToRemove = action.payload;
+      idsToRemove.forEach((id) => {
+        delete state.items[id];
+      });
+      let count = 0;
+      let price = 0;
+      Object.values(state.items).forEach((item) => {
+        count += item.quantity;
+        price += (item.product.price || 0) * item.quantity;
+      });
+      state.totalCount = count;
+      state.totalPrice = price;
+      saveCartToStorage(state.items);
     },
   },
   extraReducers: (builder) => {
@@ -454,6 +506,7 @@ export const {
   removeFromCartLocal,
   updateQuantityLocal,
   clearCartLocal,
+  removeVendorItemsLocal,
 } = cartSlice.actions;
 
 export default cartSlice.reducer;

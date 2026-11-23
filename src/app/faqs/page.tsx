@@ -122,9 +122,9 @@ export default function FAQsPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       <Header />
 
-      <main className="flex-1 w-[92%] max-w-4xl mx-auto py-10 sm:py-14">
+      <main className="flex-1 w-[94%] sm:w-[92%] max-w-4xl mx-auto py-6 sm:py-10 md:py-14">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 sm:mb-6">
           <Link href="/" className="hover:text-emerald-700 flex items-center gap-1 font-semibold">
             <ArrowLeft className="w-3.5 h-3.5" />
             Home
@@ -134,16 +134,16 @@ export default function FAQsPage() {
         </div>
 
         {/* Hero Card with Search */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xs mb-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-[#0C831F]">
               <HelpCircle className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
                 Help &amp; FAQs
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 Have questions about orders, 15-25 min delivery, or payments? We have answers.
               </p>
             </div>
@@ -185,7 +185,7 @@ export default function FAQsPage() {
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1.5 inline-block">
                         {faq.category}
                       </span>
-                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900">
                         {faq.question}
                       </h3>
                     </div>
@@ -215,7 +215,7 @@ export default function FAQsPage() {
         </div>
 
         {/* Still Need Help Footer Banner */}
-        <div className="mt-8 bg-gradient-to-r from-emerald-800 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mt-8 bg-gradient-to-r from-emerald-800 to-emerald-950 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h4 className="text-base sm:text-lg font-bold">Still have questions?</h4>
             <p className="text-xs text-emerald-200 mt-0.5">

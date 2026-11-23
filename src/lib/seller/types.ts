@@ -382,3 +382,21 @@ export interface Attribute {
   status?: string;
   isGlobal?: boolean;
 }
+
+export interface SellerSubCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  image?: string;
+  displayOrder?: number;
+}
+
+export interface SellerCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  displayOrder?: number;
+  subCategories?: SellerSubCategory[];
+}

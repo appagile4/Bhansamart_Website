@@ -3,9 +3,11 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   Ban,
   Box,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -110,6 +112,10 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<AdminCategory | { level: 0 | 1; parent?: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmCategory, setConfirmCategory] = useState<{
+    category: AdminCategory;
+    targetActive: boolean;
+  } | null>(null);
 
   const all = useMemo(() => q.data?.all || [], [q.data]);
   const roots = useMemo(() => all.filter((c) => c.level === 0 || !parentId(c)), [all]);
@@ -121,14 +127,13 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
 
   const toggleAll = () => setCollapsed(allExpanded ? Object.fromEntries(roots.map((r) => [r._id, true])) : {});
 
-  const toggleActive = async (c: AdminCategory) => {
-    const next = c.isActive === false;
-    if (!next && c.level === 0 && !window.confirm(`Deactivate "${c.name}"? Its subcategories will also be hidden from the customer app.`)) return;
+  const toggleActive = async (c: AdminCategory, targetActive: boolean) => {
     setBusyId(c._id);
     onError(null);
     try {
-      await api.updateCategory(c._id, { isActive: next });
-      onNotice(`"${c.name}" is now ${next ? "active" : "deactivated"}.`);
+      await api.updateCategory(c._id, { isActive: targetActive });
+      onNotice(`"${c.name}" is now ${targetActive ? "active" : "deactivated"}.`);
+      setConfirmCategory(null);
       q.reload();
     } catch (e) {
       onError(api.errorText(e));
@@ -163,6 +168,11 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#E2E8F0] text-xs font-bold text-[#0F172A]">
           <Layers className="w-3.5 h-3.5 text-[#0284C7]" /> {subCount} Subcategories
         </span>
+        {q.loading && q.data && (
+          <span className="inline-flex items-center gap-1 text-xs text-[#64748B] font-medium">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#10B981]" /> Updating…
+          </span>
+        )}
         <button type="button" onClick={toggleAll} className="ml-auto text-xs font-extrabold text-[#10B981] hover:underline cursor-pointer">
           {allExpanded ? "Collapse All" : "Expand All"}
         </button>
@@ -225,10 +235,27 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
                   <button
                     type="button"
                     disabled={busyId === r._id}
-                    onClick={() => toggleActive(r)}
-                    className={`inline-flex items-center gap-1 h-8 px-3 rounded-lg border text-xs font-bold cursor-pointer disabled:opacity-60 ${active ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#EF4444]" : "bg-[#ECFDF5] border-[#6EE7B7] text-[#10B981]"}`}
+                    onClick={() => setConfirmCategory({ category: r, targetActive: !active })}
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-bold cursor-pointer disabled:opacity-60 transition-colors ${
+                      active
+                        ? "bg-[#FEF2F2] border-[#FCA5A5] text-[#EF4444] hover:bg-[#FEE2E2]"
+                        : "bg-[#ECFDF5] border-[#6EE7B7] text-[#10B981] hover:bg-[#D1FAE5]"
+                    }`}
                   >
-                    {active ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />} {active ? "Deactivate" : "Activate"}
+                    {busyId === r._id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : active ? (
+                      <Ban className="w-3.5 h-3.5" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    {busyId === r._id
+                      ? active
+                        ? "Deactivating…"
+                        : "Activating…"
+                      : active
+                      ? "Deactivate"
+                      : "Activate"}
                   </button>
                   <button type="button" onClick={() => setEditing(r)} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[#F1F5F9] border border-[#E2E8F0] text-xs font-bold text-[#0F172A] cursor-pointer">
                     <Pencil className="w-3.5 h-3.5" /> Edit
@@ -276,11 +303,24 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
                               <button
                                 type="button"
                                 disabled={busyId === c._id}
-                                onClick={() => toggleActive(c)}
-                                className={`px-1.5 py-0.5 rounded-md border text-[10px] font-bold cursor-pointer disabled:opacity-60 ${subActive ? "bg-[#ECFDF5] border-[#10B981] text-[#10B981]" : "bg-[#FEF2F2] border-[#EF4444] text-[#EF4444]"}`}
+                                onClick={() => setConfirmCategory({ category: c, targetActive: !subActive })}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold cursor-pointer disabled:opacity-60 transition-colors ${
+                                  subActive
+                                    ? "bg-[#ECFDF5] border-[#10B981] text-[#10B981] hover:bg-[#D1FAE5]"
+                                    : "bg-[#FEF2F2] border-[#EF4444] text-[#EF4444] hover:bg-[#FEE2E2]"
+                                }`}
                                 title={subActive ? "Deactivate" : "Activate"}
                               >
-                                {subActive ? "Active" : "Inactive"}
+                                {busyId === c._id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                ) : null}
+                                {busyId === c._id
+                                  ? subActive
+                                    ? "Deactivating…"
+                                    : "Activating…"
+                                  : subActive
+                                  ? "Active"
+                                  : "Inactive"}
                               </button>
                               <button type="button" onClick={() => setEditing(c)} className="w-7 h-7 rounded-md bg-white border border-[#E2E8F0] flex items-center justify-center cursor-pointer" aria-label={`Edit ${c.name}`}>
                                 <Pencil className="w-3 h-3 text-[#0F172A]" />
@@ -297,6 +337,114 @@ function CategoriesTab({ q, onNotice, onError }: { q: CatsQuery; onNotice: (m: s
           })}
         </div>
       )}
+
+      {/* Confirmation Modal before activating or deactivating a category */}
+      {confirmCategory && (() => {
+        const c = confirmCategory.category;
+        const isRoot = c.level === 0 || !parentId(c);
+        const targetActive = confirmCategory.targetActive;
+        const isBusy = busyId === c._id;
+        return (
+          <Modal
+            open
+            title={
+              targetActive
+                ? isRoot
+                  ? "Activate Root Category"
+                  : "Activate Subcategory"
+                : isRoot
+                ? "Deactivate Root Category"
+                : "Deactivate Subcategory"
+            }
+            onClose={() => (isBusy ? undefined : setConfirmCategory(null))}
+            footer={
+              <>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => setConfirmCategory(null)}
+                  className={btn.ghost}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => toggleActive(c, targetActive)}
+                  className={targetActive ? btn.success : btn.dangerSolid}
+                >
+                  {isBusy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {targetActive ? "Activating…" : "Deactivating…"}
+                    </>
+                  ) : targetActive ? (
+                    isRoot ? "Activate Category" : "Activate Subcategory"
+                  ) : isRoot ? (
+                    "Deactivate Category"
+                  ) : (
+                    "Deactivate Subcategory"
+                  )}
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="w-12 h-12 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center shrink-0">
+                  {c.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Shapes className="w-5 h-5 text-slate-500" />
+                  )}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-extrabold text-slate-900 truncate">{c.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-slate-500 font-mono">/{c.slug}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-[10px] font-bold text-slate-600">
+                      {isRoot ? "Root Category" : "Subcategory"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
+                  targetActive
+                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                    : "bg-red-50/80 border-red-200 text-red-900"
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  {targetActive ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="font-bold">
+                      {targetActive
+                        ? `Activate "${c.name}"?`
+                        : `Deactivate "${c.name}"?`}
+                    </p>
+                    <p className="text-[11px] opacity-90">
+                      {targetActive
+                        ? isRoot
+                          ? "This root category and its active subcategories will immediately become visible to customers across the storefront and navigation."
+                          : "This subcategory will immediately become visible under its parent category in the customer store."
+                        : isRoot
+                        ? "Deactivating this root category will immediately hide it, all of its child subcategories, and associated products from customer browsing and searching in the customer app."
+                        : "Deactivating this subcategory will hide it from customer browse views and category navigation."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {editing && (
         <CategoryEditor
@@ -537,21 +685,25 @@ function ProductsTab({ onNotice, onError, onTotal }: { onNotice: (m: string) => 
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<20 | 30>(20);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmProduct, setConfirmProduct] = useState<{
+    product: AdminProduct;
+    targetActive: boolean;
+  } | null>(null);
   const q = useAsync(async () => {
-    const r = await api.getProducts({ search: search || undefined, page, limit: 15 });
+    const r = await api.getProducts({ search: search || undefined, page, limit });
     onTotal(r.total);
     return r;
-  }, `${search}|${page}`);
+  }, `${search}|${page}|${limit}`);
 
-  const toggle = async (p: AdminProduct) => {
-    const next = !p.isActive;
-    if (!window.confirm(`${next ? "Approve listing" : "Suspend listing"} for "${p.name}"?`)) return;
+  const toggle = async (p: AdminProduct, targetActive: boolean) => {
     setBusyId(p._id);
     onError(null);
     try {
-      await api.moderateProduct(p._id, { isActive: next });
-      onNotice(`"${p.name}" is now ${next ? "an active listing" : "suspended / hidden"}.`);
+      await api.moderateProduct(p._id, { isActive: targetActive });
+      onNotice(`"${p.name}" is now ${targetActive ? "an active listing" : "suspended / hidden"}.`);
+      setConfirmProduct(null);
       q.reload();
     } catch (e) {
       onError(api.errorText(e));
@@ -563,32 +715,51 @@ function ProductsTab({ onNotice, onError, onTotal }: { onNotice: (m: string) => 
   const products = q.data?.data || [];
   return (
     <>
-      <form
-        className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[10px] px-3 h-11"
-        role="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setPage(1);
-          setSearch(input.trim());
-        }}
-      >
-        <Search className="w-4 h-4 text-[#94A3B8] shrink-0" />
-        <input className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-[#94A3B8]" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Search products by title or sku..." aria-label="Search products" />
-        {input && (
-          <button
-            type="button"
-            onClick={() => {
-              setInput("");
-              setSearch("");
-              setPage(1);
-            }}
-            className="cursor-pointer"
-            aria-label="Clear search"
-          >
-            <X className="w-4 h-4 text-[#94A3B8]" />
-          </button>
-        )}
-      </form>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <form
+          className="flex-1 flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[10px] px-3 h-11"
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setPage(1);
+            setSearch(input.trim());
+          }}
+        >
+          {q.loading && q.data ? (
+            <Loader2 className="w-4 h-4 text-[#10B981] animate-spin shrink-0" />
+          ) : (
+            <Search className="w-4 h-4 text-[#94A3B8] shrink-0" />
+          )}
+          <input className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-[#94A3B8]" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Search products by title or sku..." aria-label="Search products" />
+          {input && (
+            <button
+              type="button"
+              onClick={() => {
+                setInput("");
+                setSearch("");
+                setPage(1);
+              }}
+              className="cursor-pointer"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4 text-[#94A3B8]" />
+            </button>
+          )}
+        </form>
+
+        <select
+          value={limit}
+          onChange={(e) => {
+            setLimit(Number(e.target.value) as 20 | 30);
+            setPage(1);
+          }}
+          className={`${field} h-11 w-auto pr-8 bg-white shrink-0`}
+          aria-label="Items per page"
+        >
+          <option value={20}>20 per page</option>
+          <option value={30}>30 per page</option>
+        </select>
+      </div>
 
       {q.error && <ErrorBanner message={q.error} onRetry={q.reload} />}
       {q.loading && !q.data ? (
@@ -647,11 +818,27 @@ function ProductsTab({ onNotice, onError, onTotal }: { onNotice: (m: string) => 
                   <button
                     type="button"
                     disabled={busyId === p._id}
-                    onClick={() => toggle(p)}
-                    className={`inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border text-[11px] font-bold cursor-pointer disabled:opacity-60 ${active ? "bg-[#FEF2F2] border-[#EF4444] text-[#EF4444]" : "bg-[#ECFDF5] border-[#10B981] text-[#10B981]"}`}
+                    onClick={() => setConfirmProduct({ product: p, targetActive: !active })}
+                    className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-bold cursor-pointer disabled:opacity-60 transition-colors ${
+                      active
+                        ? "bg-[#FEF2F2] border-[#EF4444] text-[#EF4444] hover:bg-[#FEE2E2]"
+                        : "bg-[#ECFDF5] border-[#10B981] text-[#10B981] hover:bg-[#D1FAE5]"
+                    }`}
                   >
-                    {active ? <Ban className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                    {active ? "Suspend" : "Approve Listing"}
+                    {busyId === p._id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : active ? (
+                      <Ban className="w-3 h-3" />
+                    ) : (
+                      <Check className="w-3 h-3" />
+                    )}
+                    {busyId === p._id
+                      ? active
+                        ? "Suspending…"
+                        : "Approving…"
+                      : active
+                      ? "Suspend"
+                      : "Approve Listing"}
                   </button>
                 </div>
               </article>
@@ -661,17 +848,115 @@ function ProductsTab({ onNotice, onError, onTotal }: { onNotice: (m: string) => 
       )}
       {(q.data?.totalPages || 1) > 1 && (
         <div className="flex items-center justify-center gap-3">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((x) => x - 1)} className={btn.outline} aria-label="Previous page">
+          <button type="button" disabled={page <= 1 || q.loading} onClick={() => setPage((x) => x - 1)} className={btn.outline} aria-label="Previous page">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm text-[#475569]">
             Page {page} of {q.data?.totalPages}
           </span>
-          <button type="button" disabled={page >= (q.data?.totalPages || 1)} onClick={() => setPage((x) => x + 1)} className={btn.outline} aria-label="Next page">
+          <button type="button" disabled={page >= (q.data?.totalPages || 1) || q.loading} onClick={() => setPage((x) => x + 1)} className={btn.outline} aria-label="Next page">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
+
+      {/* Confirmation Modal before approving or suspending a product */}
+      {confirmProduct && (() => {
+        const p = confirmProduct.product;
+        const targetActive = confirmProduct.targetActive;
+        const isBusy = busyId === p._id;
+        const img = p.images?.[0]?.url;
+        const vendor = p.vendor?.businessDetails?.businessName || p.vendor?.storeName || "Direct Store";
+        return (
+          <Modal
+            open
+            title={targetActive ? "Approve Product Listing" : "Suspend Product Listing"}
+            onClose={() => (isBusy ? undefined : setConfirmProduct(null))}
+            footer={
+              <>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => setConfirmProduct(null)}
+                  className={btn.ghost}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => toggle(p, targetActive)}
+                  className={targetActive ? btn.success : btn.dangerSolid}
+                >
+                  {isBusy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {targetActive ? "Approving…" : "Suspending…"}
+                    </>
+                  ) : targetActive ? (
+                    "Approve Listing"
+                  ) : (
+                    "Suspend Listing"
+                  )}
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="w-14 h-14 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center shrink-0">
+                  {img ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Box className="w-6 h-6 text-slate-500" />
+                  )}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-extrabold text-slate-900 truncate">{p.name}</p>
+                  <p className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                    <Store className="w-3 h-3 text-[#0284C7] shrink-0" /> {vendor}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-black text-[#10B981]">{nprNum(p.price)}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 font-semibold truncate">
+                      {p.category || "General"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
+                  targetActive
+                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                    : "bg-red-50/80 border-red-200 text-red-900"
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  {targetActive ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="font-bold">
+                      {targetActive
+                        ? `Approve listing for "${p.name}"?`
+                        : `Suspend listing for "${p.name}"?`}
+                    </p>
+                    <p className="text-[11px] opacity-90">
+                      {targetActive
+                        ? "This product listing will be marked as active and made immediately available for customers to view and purchase across the Bhansamart store."
+                        : "This product listing will be immediately suspended and hidden from the customer store. Customers will not be able to find or purchase this item."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </>
   );
 }

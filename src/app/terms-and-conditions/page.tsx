@@ -13,9 +13,9 @@ export default function TermsAndConditionsPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       <Header />
 
-      <main className="flex-1 w-[92%] max-w-4xl mx-auto py-10 sm:py-14">
+      <main className="flex-1 w-[94%] sm:w-[92%] max-w-4xl mx-auto py-6 sm:py-10 md:py-14">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 sm:mb-6">
           <Link href="/" className="hover:text-emerald-700 flex items-center gap-1 font-semibold">
             <ArrowLeft className="w-3.5 h-3.5" />
             Home
@@ -25,22 +25,22 @@ export default function TermsAndConditionsPage() {
         </div>
 
         {/* Hero Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xs mb-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-[#0C831F]">
               <FileText className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
                 Terms &amp; Conditions
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 Effective: November 2026 • BhansaMart Commerce Private Limited
               </p>
             </div>
           </div>
 
-          <p className="text-sm text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
             Please read these Terms and Conditions carefully before using the BhansaMart website
             or mobile application. By accessing our platform or placing an order, you agree to be bound
             by these terms.

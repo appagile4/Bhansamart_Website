@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, ImagePlus, Plus, RefreshCw, Search, Sparkles, Trash2, X } from "lucide-react";
 import * as api from "@/lib/seller/api";
 import { useAsync } from "@/lib/seller/useAsync";
-import type { ProductVariant, SellerProduct } from "@/lib/seller/types";
-import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
+import type { ProductVariant, SellerCategory, SellerProduct } from "@/lib/seller/types";
 import {
   DISCOUNT_CATEGORIES,
   GENERIC_BRAND,
@@ -42,11 +41,25 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
   const router = useRouter();
   const isEdit = Boolean(initial);
 
+  // Dynamic Categories from backend catalog
+  const categoriesQ = useAsync(() => api.getCategories(), "categories");
+
+  const categoriesList = useMemo<SellerCategory[]>(() => {
+    if (categoriesQ.data && categoriesQ.data.length > 0) {
+      return categoriesQ.data;
+    }
+    return [];
+  }, [categoriesQ.data]);
+
+  const categoryNames = useMemo(() => {
+    return categoriesList.map((c) => c.name);
+  }, [categoriesList]);
+
   // 1. General information
   const [name, setName] = useState(initial?.name || "");
   const [description, setDescription] = useState(initial?.description || "");
-  const [category, setCategory] = useState(initial?.category || MAIN_CATEGORY_NAMES[0] || "Grocery & Kitchen");
-  const [subCategory, setSubCategory] = useState(initial?.subCategory || subCategoriesFor(initial?.category || MAIN_CATEGORY_NAMES[0])[0] || "");
+  const [category, setCategory] = useState(initial?.category || "");
+  const [subCategory, setSubCategory] = useState(initial?.subCategory || "");
   const [supplierName, setSupplierName] = useState(initial?.supplierName || SUPPLIER_OPTIONS[0]);
   const [expirationDate, setExpirationDate] = useState(initial?.expirationDate ? String(initial.expirationDate).slice(0, 10) : "");
   const [brand, setBrand] = useState((typeof initial?.brandRef === "object" && initial.brandRef?.name) || initial?.brand || GENERIC_BRAND);
@@ -79,7 +92,7 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
   );
 
   // 4. Inventory
-  const [sku, setSku] = useState(initial?.sku || generateSku(category));
+  const [sku, setSku] = useState(initial?.sku || (category ? generateSku(category) : ""));
   const [stock, setStock] = useState(initial ? String(initial.stock ?? 0) : "50");
   const [reorderLevel, setReorderLevel] = useState(initial?.reorderLevel != null ? String(initial.reorderLevel) : "10");
 
@@ -119,6 +132,38 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Selected category doc from dynamic categories
+  const activeCategoryItem = useMemo(() => {
+    if (!category) return null;
+    return categoriesList.find(
+      (c) => c.name.toLowerCase().trim() === category.toLowerCase().trim()
+    );
+  }, [categoriesList, category]);
+
+  // Subcategories for the selected category
+  const subCategories = useMemo<string[]>(() => {
+    if (activeCategoryItem && Array.isArray(activeCategoryItem.subCategories)) {
+      return activeCategoryItem.subCategories.map((s) => s.name);
+    }
+    return category ? subCategoriesFor(category) : [];
+  }, [activeCategoryItem, category]);
+
+  // Initialize category & subcategory once categories load (for new product)
+  useEffect(() => {
+    if (!isEdit && categoriesList.length > 0) {
+      const match = categoriesList.find(
+        (c) => c.name.toLowerCase().trim() === (category || "").toLowerCase().trim()
+      );
+      if (!category || !match) {
+        const first = categoriesList[0];
+        setCategory(first.name);
+        const firstSub = first.subCategories?.[0]?.name || "";
+        setSubCategory(firstSub);
+        setSku((curr) => (!curr || curr.startsWith("BM-PROD-") ? generateSku(first.name) : curr));
+      }
+    }
+  }, [categoriesList, isEdit, category]);
+
   // Brands & attributes for the chosen category
   const brandsQ = useAsync(() => api.getBrands({ category, limit: 100 }), `b-${category}`);
   const attrsQ = useAsync(() => api.getAttributes({ category }), `a-${category}`);
@@ -144,14 +189,19 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
     return q ? list.filter((b) => b.name.toLowerCase().includes(q)) : list;
   }, [brandsQ.data, category, brandSearch]);
 
-  const subCategories = useMemo(() => subCategoriesFor(category), [category]);
-
   const changeCategory = (c: string) => {
     setCategory(c);
-    setSubCategory(subCategoriesFor(c)[0] || "");
+    const catItem = categoriesList.find(
+      (item) => item.name.toLowerCase().trim() === c.toLowerCase().trim()
+    );
+    const subs = catItem?.subCategories?.map((s) => s.name) || subCategoriesFor(c);
+    setSubCategory(subs[0] || "");
     setBrand(GENERIC_BRAND);
     setBrandId(null);
     setSelectedAttrs({});
+    if (!isEdit) {
+      setSku(generateSku(c));
+    }
   };
 
   const toggleAttrValue = (attr: string, value: string, multiple: boolean) =>
@@ -291,20 +341,51 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
                     <span className={fieldLabel}>Category *</span>
-                    <select className={field} value={category} onChange={(e) => changeCategory(e.target.value)}>
-                      {MAIN_CATEGORY_NAMES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
+                    {categoriesQ.loading && !categoriesQ.data ? (
+                      <div className="h-10 w-full rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
+                    ) : (
+                      <select
+                        className={field}
+                        value={category}
+                        onChange={(e) => changeCategory(e.target.value)}
+                        disabled={categoriesQ.loading && categoryNames.length === 0}
+                      >
+                        {categoryNames.length === 0 ? (
+                          <option value="">No categories found</option>
+                        ) : (
+                          categoryNames.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))
+                        )}
+                        {category && !categoryNames.includes(category) && (
+                          <option value={category}>{category}</option>
+                        )}
+                      </select>
+                    )}
                   </label>
                   <label className="block">
                     <span className={fieldLabel}>Sub-category</span>
-                    <select className={field} value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
-                      {subCategories.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                      {subCategory && !subCategories.includes(subCategory) && <option>{subCategory}</option>}
-                    </select>
+                    {categoriesQ.loading && !categoriesQ.data ? (
+                      <div className="h-10 w-full rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
+                    ) : (
+                      <select
+                        className={field}
+                        value={subCategory}
+                        onChange={(e) => setSubCategory(e.target.value)}
+                        disabled={categoriesQ.loading && subCategories.length === 0}
+                      >
+                        {subCategories.length === 0 ? (
+                          <option value="">No sub-categories</option>
+                        ) : (
+                          subCategories.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))
+                        )}
+                        {subCategory && !subCategories.includes(subCategory) && (
+                          <option value={subCategory}>{subCategory}</option>
+                        )}
+                      </select>
+                    )}
                   </label>
                   <label className="block">
                     <span className={fieldLabel}>Supplier</span>
@@ -642,7 +723,7 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
         </div>
 
         {/* Submit bar */}
-        <div className="sticky bottom-0 z-20 -mx-4 md:-mx-6 lg:-mx-8 bg-white/95 backdrop-blur border-t border-slate-200 px-4 md:px-6 lg:px-8 py-3 flex flex-wrap justify-end gap-2">
+        <div className="sticky bottom-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 bg-white/95 backdrop-blur border-t border-slate-200 px-3 sm:px-4 md:px-6 lg:px-8 py-3 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => router.back()} className={btn.ghost} disabled={submitting !== null}>
             Cancel
           </button>
@@ -662,6 +743,7 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
         onClose={() => setBrandModal(false)}
         defaultCategory={category}
         defaultName={brandSearch}
+        availableCategories={categoryNames}
         onSubmitted={(m) => {
           setNotice(`${m} You can use it once it's approved.`);
           brandsQ.reload();
@@ -671,6 +753,7 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
         open={attrModal}
         onClose={() => setAttrModal(false)}
         defaultCategory={category}
+        availableCategories={categoryNames}
         onSubmitted={(m) => {
           setNotice(m);
           attrsQ.reload();

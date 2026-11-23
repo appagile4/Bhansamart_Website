@@ -180,8 +180,8 @@ export default function StaffAdminsPage() {
                         />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-extrabold text-slate-900 truncate">{a.name}</p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="text-sm font-extrabold text-slate-900 break-words min-w-0">{a.name}</p>
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-sky-50 text-[#0284C7] border border-sky-100 uppercase tracking-wider shrink-0">
                             Staff Admin
                           </span>

@@ -17,6 +17,7 @@ export interface SectionCategoryData {
   title: string;
   badge?: string;
   iconName?: string;
+  imageUrl?: string;
   items: CategoryCardData[];
 }
 
@@ -25,6 +26,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "grocery-kitchen",
     title: "Grocery & Kitchen",
     badge: "Daily Staples",
+    imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&q=80",
     items: [
       {
         id: "veg-fruits",
@@ -88,6 +90,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "snacks-drinks",
     title: "Snacks & Drinks",
     badge: "Quick Bites",
+    imageUrl: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=500&q=80",
     items: [
       {
         id: "chips-nachos-popcorn",
@@ -151,6 +154,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "beauty-personal-care",
     title: "Beauty & Personal Care",
     badge: "Self Care",
+    imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80",
     items: [
       {
         id: "bath-body",
@@ -214,6 +218,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "baby",
     title: "Baby",
     badge: "Baby Care",
+    imageUrl: "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=500&q=80",
     items: [
       {
         id: "baby-food",
@@ -277,6 +282,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "school-office-stationery",
     title: "School, Office & Stationery",
     badge: "Stationery",
+    imageUrl: "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=500&q=80",
     items: [
       {
         id: "pens-pencils",
@@ -340,6 +346,7 @@ export const ALL_CATEGORY_SECTIONS: SectionCategoryData[] = [
     id: "gifting",
     title: "Gifting",
     badge: "Presents & Hampers",
+    imageUrl: "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=500&q=80",
     items: [
       {
         id: "chocolates-sweets",

@@ -45,9 +45,9 @@ export default function ContactUsPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       <Header />
 
-      <main className="flex-1 w-[92%] max-w-5xl mx-auto py-10 sm:py-14">
+      <main className="flex-1 w-[94%] sm:w-[92%] max-w-5xl mx-auto py-6 sm:py-10 md:py-14">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 sm:mb-6">
           <Link href="/" className="hover:text-emerald-700 flex items-center gap-1 font-semibold">
             <ArrowLeft className="w-3.5 h-3.5" />
             Home
@@ -57,22 +57,22 @@ export default function ContactUsPage() {
         </div>
 
         {/* Hero Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xs mb-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-[#0C831F]">
               <Headphones className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
                 Contact &amp; Customer Support
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 We are here to help you 7 days a week from 7:00 AM to 11:00 PM
               </p>
             </div>
           </div>
 
-          <p className="text-sm text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
             Have a question about your delivery, an item replacement, or vendor partnerships?
             Reach out via phone, email, or fill out the support form below and our team will get back to you promptly.
           </p>
@@ -144,7 +144,7 @@ export default function ContactUsPage() {
           </div>
 
           {/* Right Column: Send Us a Message Form (7 cols) */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs">
+          <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-200/80 shadow-xs">
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mb-1">
               Send Us a Message
             </h2>

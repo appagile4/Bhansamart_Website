@@ -14,6 +14,8 @@
 
 /* Seller Hub palette — mirrors VendorColors in Bhansamart_frontend/src/constants/theme.ts */
 @theme {
+  /* Small-phone breakpoint used by the storefront header (xs: classes) */
+  --breakpoint-xs: 400px;
   --color-vendor: #016073;
   --color-vendor-hover: #014c5c;
   --color-vendor-dark: #003844;
@@ -31,6 +33,12 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: clip;
 }
 
 body {

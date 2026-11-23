@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ALL_CATEGORY_SECTIONS,
   ALL_CATEGORY_ITEMS,
 } from "@/lib/constants/categories";
+import { Zap, ShieldCheck, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
 
 // ── Useful Links Data ──
 const USEFUL_LINKS = [
@@ -15,7 +16,6 @@ const USEFUL_LINKS = [
   { label: "FAQs", href: "/faqs" },
   { label: "Security", href: "/security" },
   { label: "Contact Us", href: "/contact-us" },
-  // Seller Hub entry (login / register / dashboard)
   { label: "Become a Seller", href: "/seller" },
 ];
 
@@ -62,8 +62,15 @@ const REAL_CATEGORIES_COL_3 = [
   "Electronics & Gadgets",
 ];
 
+const ALL_FOOTER_CATEGORIES = [
+  ...REAL_CATEGORIES_COL_1,
+  ...REAL_CATEGORIES_COL_2,
+  ...REAL_CATEGORIES_COL_3,
+];
+
 export default function Footer() {
   const router = useRouter();
+  const [showAllCategoriesMobile, setShowAllCategoriesMobile] = useState(false);
 
   const handleCategoryClick = (categoryName: string) => {
     // 1. Check if category matches a subcategory item
@@ -98,24 +105,62 @@ export default function Footer() {
     }
   };
 
+  const visibleMobileCategories = showAllCategoriesMobile
+    ? ALL_FOOTER_CATEGORIES
+    : ALL_FOOTER_CATEGORIES.slice(0, 10);
+
   return (
     <footer className="w-full bg-white border-t border-slate-200/80 text-slate-700 mt-auto select-none">
-      <div className="w-[90%] lg:w-[85%] max-w-7xl mx-auto pt-12 pb-8">
+      <div className="w-[94%] sm:w-[92%] md:w-[90%] lg:w-[85%] max-w-7xl mx-auto pt-6 sm:pt-10 pb-6 sm:pb-8">
         
-        {/* ── Top Section: Useful Links & Real Categories ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 pb-10">
+        {/* ── 1. Trust & Service Value Proposition Strip ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pb-6 sm:pb-8 mb-6 sm:mb-8 border-b border-slate-100">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/60">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-[#0C831F] flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight">Superfast Delivery</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight mt-0.5">Groceries at your door in 15-25 minutes</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/60">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight">Best Quality Assured</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight mt-0.5">100% genuine & fresh products guaranteed</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/60">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight">Secure Payments</h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight mt-0.5">UPI, Cards, NetBanking & COD supported</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 2. Middle Section: Useful Links & Real Categories ── */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 pb-6 sm:pb-10">
           
           {/* ── Left Column: Useful Links ── */}
-          <div className="lg:col-span-3 xl:col-span-3">
-            <h3 className="text-base font-extrabold text-slate-900 mb-5 tracking-tight">
+          <div className="md:col-span-4 lg:col-span-3">
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 mb-3 sm:mb-4 tracking-tight">
               Useful Links
             </h3>
-            <div className="space-y-2.5 text-xs text-slate-600">
+            {/* 2 columns on mobile, 1 column on desktop for compact layout */}
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-x-4 gap-y-2 text-xs text-slate-600">
               {USEFUL_LINKS.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="block hover:text-[#0C831F] transition-colors leading-snug cursor-pointer font-medium"
+                  className="block hover:text-[#0C831F] active:text-[#0C831F] transition-colors leading-snug cursor-pointer font-medium py-1 truncate"
                 >
                   {item.label}
                 </Link>
@@ -123,10 +168,10 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* ── Right Column: Real Categories with Active Route ── */}
-          <div className="lg:col-span-9 xl:col-span-9">
-            <div className="flex items-center gap-2.5 mb-5">
-              <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+          {/* ── Right Column: Categories ── */}
+          <div className="md:col-span-8 lg:col-span-9">
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
                 Categories
               </h3>
               <Link
@@ -138,11 +183,47 @@ export default function Footer() {
                 }}
                 className="text-xs font-bold text-[#0C831F] hover:underline cursor-pointer"
               >
-                see all
+                see all ({ALL_FOOTER_CATEGORIES.length})
               </Link>
             </div>
 
-            <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs text-slate-600">
+            {/* ── Mobile Layout (< md): Clean 2-column curated grid with expandable toggle ── */}
+            <div className="block md:hidden">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
+                {visibleMobileCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleCategoryClick(cat)}
+                    className="block text-left text-xs text-slate-600 hover:text-[#0C831F] active:text-[#0C831F] transition-colors leading-snug cursor-pointer truncate py-1 px-1 rounded-lg hover:bg-slate-50 w-full"
+                    title={`Browse ${cat}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Show More / Show Less Toggle Button for Mobile */}
+              <button
+                type="button"
+                onClick={() => setShowAllCategoriesMobile(!showAllCategoriesMobile)}
+                className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-[#0C831F] hover:text-[#096618] bg-emerald-50/80 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/60 px-3.5 py-1.5 rounded-full transition cursor-pointer"
+              >
+                <span>
+                  {showAllCategoriesMobile
+                    ? "Show fewer categories"
+                    : `View all ${ALL_FOOTER_CATEGORIES.length} categories`}
+                </span>
+                {showAllCategoriesMobile ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+
+            {/* ── Desktop & Tablet Layout (>= md): Full 3 Columns ── */}
+            <div className="hidden md:grid md:grid-cols-3 gap-x-4 gap-y-2 text-xs text-slate-600">
               {/* Category Col 1 */}
               <div className="space-y-2.5">
                 {REAL_CATEGORIES_COL_1.map((cat) => (
@@ -191,52 +272,50 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* ── Bottom Section: Copyright, Download App, Social Icons ── */}
-        <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Copyright */}
-          <div className="text-xs text-slate-500 font-medium">
-            © BhansaMart Commerce Private Limited, 2016-2026
-          </div>
-
+        {/* ── 3. Bottom Section: Download App, Social Icons, Copyright ── */}
+        <div className="pt-5 sm:pt-7 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-5 sm:gap-6 text-center md:text-left">
+          
           {/* Download App Buttons */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2.5 order-1 md:order-2">
             <span className="text-xs font-bold text-slate-700">Download App</span>
 
-            {/* Apple App Store */}
-            <a
-              href="https://apps.apple.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-[#121417] hover:bg-black text-white px-3 py-1.5 rounded-lg text-left transition shadow-xs cursor-pointer"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 1.01-2.87-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.74-1.02 2.78 1.05.08 2.12-.56 2.74-1.31z"/>
-              </svg>
-              <div>
-                <span className="block text-[8px] uppercase tracking-wider text-slate-300 font-medium">Download on the</span>
-                <span className="block text-xs font-bold -mt-0.5 tracking-tight">App Store</span>
-              </div>
-            </a>
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto max-w-xs sm:max-w-none">
+              {/* Apple App Store */}
+              <a
+                href="https://apps.apple.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center sm:justify-start gap-2 bg-[#121417] hover:bg-black text-white px-3 py-1.5 rounded-xl text-left transition shadow-xs cursor-pointer w-full sm:w-auto"
+              >
+                <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 1.01-2.87-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.74-1.02 2.78 1.05.08 2.12-.56 2.74-1.31z"/>
+                </svg>
+                <div>
+                  <span className="block text-[8px] uppercase tracking-wider text-slate-300 font-medium">Download on the</span>
+                  <span className="block text-xs font-bold -mt-0.5 tracking-tight">App Store</span>
+                </div>
+              </a>
 
-            {/* Google Play */}
-            <a
-              href="https://play.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-[#121417] hover:bg-black text-white px-3 py-1.5 rounded-lg text-left transition shadow-xs cursor-pointer"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M3.609 1.814L13.792 12 3.61 22.186a2.023 2.023 0 0 1-.61-1.443V3.257c0-.555.226-1.066.609-1.443zm11.246 11.247l2.25 2.25-11.83 6.83 9.58-9.08zm2.25-2.25l-2.25 2.25L5.275 3.98l11.83 6.831zm1.06 1.06l3.528 2.037a1.05 1.05 0 0 1 0 1.814l-3.528 2.037-2.062-2.062 2.062-2.826z"/>
-              </svg>
-              <div>
-                <span className="block text-[8px] uppercase tracking-wider text-slate-300 font-medium">GET IT ON</span>
-                <span className="block text-xs font-bold -mt-0.5 tracking-tight">Google Play</span>
-              </div>
-            </a>
+              {/* Google Play */}
+              <a
+                href="https://play.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center sm:justify-start gap-2 bg-[#121417] hover:bg-black text-white px-3 py-1.5 rounded-xl text-left transition shadow-xs cursor-pointer w-full sm:w-auto"
+              >
+                <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                  <path d="M3.609 1.814L13.792 12 3.61 22.186a2.023 2.023 0 0 1-.61-1.443V3.257c0-.555.226-1.066.609-1.443zm11.246 11.247l2.25 2.25-11.83 6.83 9.58-9.08zm2.25-2.25l-2.25 2.25L5.275 3.98l11.83 6.831zm1.06 1.06l3.528 2.037a1.05 1.05 0 0 1 0 1.814l-3.528 2.037-2.062-2.062 2.062-2.826z"/>
+                </svg>
+                <div>
+                  <span className="block text-[8px] uppercase tracking-wider text-slate-300 font-medium">GET IT ON</span>
+                  <span className="block text-xs font-bold -mt-0.5 tracking-tight">Google Play</span>
+                </div>
+              </a>
+            </div>
           </div>
 
           {/* Social Icons (Black circular pills) */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center gap-2.5 order-2 md:order-3">
             {/* Facebook */}
             <a
               href="https://facebook.com"
@@ -302,10 +381,15 @@ export default function Footer() {
               </svg>
             </a>
           </div>
+
+          {/* Copyright */}
+          <div className="text-xs text-slate-500 font-medium order-3 md:order-1">
+            © BhansaMart Commerce Private Limited, 2016-2026
+          </div>
         </div>
 
-        {/* ── Disclaimer Line ── */}
-        <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
+        {/* ── 4. Disclaimer Note ── */}
+        <p className="text-[11px] text-slate-400 mt-5 leading-relaxed text-center md:text-left">
           &quot;BhansaMart&quot; is owned &amp; managed by &quot;BhansaMart Commerce Private Limited&quot; and is committed to delivering 100% fresh groceries, daily essentials, and kitchen staples to your doorstep in 15-25 minutes.
         </p>
 

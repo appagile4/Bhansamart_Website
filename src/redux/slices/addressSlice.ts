@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { AddressLocation, PRESET_HUBS } from "@/components/AddressModal";
+import { AddressLocation, PRESET_HUBS } from "@/lib/addressHubs";
 
 const ADDRESS_STORAGE_KEY = "bhansa_selected_address";
 

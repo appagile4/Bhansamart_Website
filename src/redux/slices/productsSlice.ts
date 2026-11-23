@@ -106,6 +106,8 @@ export const productsSlice = createSlice({
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false;
+        // Superseded by a newer request (e.g. the user kept typing) — not an error
+        if (action.meta.aborted) return;
         state.error = (action.payload as string) || "Failed to fetch products";
       });
   },

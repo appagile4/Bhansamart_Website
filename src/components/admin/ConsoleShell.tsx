@@ -76,6 +76,23 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
+  // Mobile drawer: lock page scroll behind it, close on Escape, and close if the screen grows to desktop
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMobileOpen(false);
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onMq = () => mq.matches && setMobileOpen(false);
+    document.addEventListener("keydown", onKey);
+    mq.addEventListener("change", onMq);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+      mq.removeEventListener("change", onMq);
+    };
+  }, [mobileOpen]);
+
   const logout = () => {
     cfg.clearSession();
     router.replace(cfg.loginHref);
@@ -99,7 +116,7 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
       {mobileOpen && <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={() => setMobileOpen(false)} aria-hidden="true" />}
 
       <aside
-        className={`bg-slate-900 text-slate-300 flex flex-col z-50 h-screen transition-all duration-300 fixed inset-y-0 left-0 w-72 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} lg:sticky lg:top-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-64"}`}
+        className={`bg-slate-900 text-slate-300 flex flex-col z-50 h-screen transition-all duration-300 fixed inset-y-0 left-0 w-72 max-w-[85vw] lg:max-w-none ${mobileOpen ? "translate-x-0" : "-translate-x-full"} lg:sticky lg:top-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-64"}`}
         aria-label="Admin navigation"
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 shrink-0">
@@ -161,12 +178,12 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 md:px-6 sticky top-0 z-30">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-2 sm:gap-3 px-2 sm:px-4 md:px-6 sticky top-0 z-30">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={() => (window.matchMedia("(min-width: 1024px)").matches ? setCollapsed((c) => !c) : setMobileOpen(true))}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer shrink-0"
               aria-label="Toggle menu"
             >
               <Menu className="w-5 h-5" />
@@ -174,15 +191,15 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-extrabold text-slate-900 truncate">{current?.label || cfg.consoleName}</p>
-                <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-[#E0F2FE] text-[#0369A1] uppercase tracking-wider shrink-0">
+                <span className="hidden min-[400px]:inline px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-[#E0F2FE] text-[#0369A1] uppercase tracking-wider shrink-0">
                   {cfg.roleLabel}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500">{cfg.headerSubtitle}</p>
+              <p className="text-[11px] text-slate-500 truncate">{cfg.headerSubtitle}</p>
             </div>
           </div>
 
-          <div className="relative" ref={profileRef}>
+          <div className="relative shrink-0" ref={profileRef}>
             <button type="button" onClick={() => setProfileOpen((o) => !o)} className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer" aria-expanded={profileOpen} aria-label="Account menu">
               <span className="w-9 h-9 rounded-full bg-[#0284C7] text-white font-bold text-sm flex items-center justify-center shadow-sm shadow-sky-600/20">
                 {mounted ? initials(session?.user?.name || "Admin") : "AD"}
@@ -196,7 +213,7 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
               <ChevronDown className="w-4 h-4 text-slate-400 hidden md:block" />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
                 <div className="px-4 py-2 border-b border-slate-100">
                   <p className="text-xs font-bold text-slate-900 truncate">{session?.user?.name}</p>
                   <p className="text-[11px] text-slate-500 truncate">{session?.user?.email}</p>
@@ -212,7 +229,10 @@ export default function ConsoleShell({ cfg, children }: { cfg: ConsoleConfig; ch
           </div>
         </header>
 
-        <main className="flex-1 w-full p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 w-full min-w-0 px-3 py-4 sm:p-4 md:p-6 lg:p-8">
+          {/* Caps line length on very wide screens so cards and tables don't stretch edge to edge */}
+          <div className="mx-auto w-full max-w-[1600px] min-w-0">{children}</div>
+        </main>
       </div>
     </div>
   );

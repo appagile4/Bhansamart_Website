@@ -288,7 +288,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(targetUrl, {
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
     clearTimeout(timeout);
 

@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import AddressModal from "@/components/AddressModal";
 import CartDrawer from "@/components/CartDrawer";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { useAppDispatch, useAppSelector, useCurrentAddress } from "@/redux/hooks";
 import {
   addToCart,
   removeFromCart,
   clearCart,
+  clearVendorCart,
 } from "@/redux/slices/cartSlice";
+import { groupCartByVendor, VendorCartGroup } from "@/lib/cartVendorUtils";
 import { openAddressModal } from "@/redux/slices/addressSlice";
 import {
   ArrowLeft,
@@ -35,14 +37,55 @@ import {
   Phone,
   Home,
   Check,
+  Store,
+  Package,
 } from "lucide-react";
 
-const getProductImg = (p: {
-  imageUrl?: string;
-  images?: Array<{ url: string }>;
-}): string => {
-  return p.imageUrl || (p.images && p.images[0]?.url) || "/images/placeholder.png";
+/** Safe image resolver for checkout products */
+const getProductImg = (product: any): string => {
+  if (!product) return "";
+  if (typeof product.imageUrl === "string" && product.imageUrl.trim()) {
+    return product.imageUrl;
+  }
+  if (typeof product.image === "string" && product.image.trim()) {
+    return product.image;
+  }
+  if (product.image && typeof product.image === "object" && product.image.url) {
+    return product.image.url;
+  }
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const first = product.images[0];
+    if (typeof first === "string" && first.trim()) return first;
+    if (first && typeof first === "object" && first.url) return first.url;
+  }
+  return "";
 };
+
+/** Robust, flicker-free product image with non-looping SVG fallback */
+function CheckoutProductImage({ product }: { product: any }) {
+  const [hasError, setHasError] = useState(false);
+  const src = getProductImg(product);
+
+  if (!src || hasError) {
+    return (
+      <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/80">
+        <Package className="w-6 h-6 text-slate-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-14 h-14 bg-slate-50 border border-slate-200/70 rounded-xl p-1 shrink-0 flex items-center justify-center overflow-hidden">
+      <img
+        src={src}
+        alt={product.name}
+        className="w-full h-full object-contain"
+        loading="lazy"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
 
 interface PaymentOption {
   methodKey: string;
@@ -112,19 +155,69 @@ const mapBackendPaymentEnum = (displayName: string, methodKey: string): string =
 
 function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialVendorParam = searchParams.get("vendorId") || "";
   const dispatch = useAppDispatch();
 
-  const { items: cartMap, totalPrice } = useAppSelector(
+  const { items: cartMap, totalCount, totalPrice } = useAppSelector(
     (state) => state.cart
   );
-  const { currentAddress } = useAppSelector((state) => state.address);
+  const currentAddress = useCurrentAddress();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
   const cartList = useMemo(() => Object.values(cartMap), [cartMap]);
-  const totalCount = useMemo(
-    () => cartList.reduce((acc, curr) => acc + curr.quantity, 0),
+  const vendorGroups: VendorCartGroup[] = useMemo(
+    () => groupCartByVendor(cartList),
     [cartList]
   );
+
+  const [selectedVendorId, setSelectedVendorId] = useState<string>(
+    initialVendorParam || (vendorGroups[0]?.vendorId ?? "")
+  );
+
+  useEffect(() => {
+    if (vendorGroups.length > 0) {
+      const exists = vendorGroups.some((g) => g.vendorId === selectedVendorId);
+      if (!exists) {
+        setSelectedVendorId(vendorGroups[0].vendorId);
+      }
+    }
+  }, [vendorGroups, selectedVendorId]);
+
+  const activeVendorGroup: VendorCartGroup | undefined = useMemo(() => {
+    if (vendorGroups.length === 0) return undefined;
+    return (
+      vendorGroups.find((g) => g.vendorId === selectedVendorId) ||
+      vendorGroups[0]
+    );
+  }, [vendorGroups, selectedVendorId]);
+
+  const remainingVendorGroups = useMemo(() => {
+    return vendorGroups.filter(
+      (g) => g.vendorId !== activeVendorGroup?.vendorId
+    );
+  }, [vendorGroups, activeVendorGroup]);
+
+  const activeCheckoutItems = useMemo(
+    () => activeVendorGroup?.items || cartList,
+    [activeVendorGroup, cartList]
+  );
+  const activeItemCount = useMemo(
+    () => activeCheckoutItems.reduce((acc, curr) => acc + curr.quantity, 0),
+    [activeCheckoutItems]
+  );
+  const activeSubtotal = useMemo(
+    () =>
+      activeCheckoutItems.reduce(
+        (acc, curr) => acc + (curr.product.price || 0) * curr.quantity,
+        0
+      ),
+    [activeCheckoutItems]
+  );
+
+  const deliveryCharge = activeSubtotal > 200 || activeSubtotal === 0 ? 0 : 25;
+  const handlingCharge = activeSubtotal > 0 ? 2 : 0;
+  const grandTotal = activeSubtotal + deliveryCharge + handlingCharge;
 
   // Client-generated Unique Idempotency Order Key
   const [orderId] = useState(() => `BM${Date.now().toString().slice(-8)}`);
@@ -134,14 +227,16 @@ function CheckoutContent() {
   const [addressType, setAddressType] = useState<string>("Home");
   const [houseNo, setHouseNo] = useState<string>("");
   const [landmark, setLandmark] = useState<string>("");
-  const [phone, setPhone] = useState<string>(() => user?.phone || "9868686868");
+  const [phone, setPhone] = useState<string>(() => user?.phone || "");
 
-  // Keep phone in sync if user profile loads
+  // Prefill once with the account's phone when the profile loads (never re-fills after the user edits)
+  const phonePrefilled = useRef(Boolean(user?.phone));
   useEffect(() => {
-    if (user?.phone && phone === "9868686868") {
-      setPhone(user.phone);
+    if (user?.phone && !phonePrefilled.current) {
+      phonePrefilled.current = true;
+      setPhone((current) => current || user.phone || "");
     }
-  }, [user, phone]);
+  }, [user?.phone]);
 
   // Payment Methods State
   const [paymentMethods, setPaymentMethods] =
@@ -194,21 +289,16 @@ function CheckoutContent() {
     loadMethods();
   }, []);
 
-  // Pricing calculations
-  const deliveryCharge = totalPrice > 200 || totalPrice === 0 ? 0 : 25;
-  const handlingCharge = totalPrice > 0 ? 30 : 0;
-  const grandTotal = totalPrice + deliveryCharge + handlingCharge;
-
   // Calculate total original savings if MRP is available
   const totalSavings = useMemo(() => {
     let savings = 0;
-    cartList.forEach((it) => {
+    activeCheckoutItems.forEach((it) => {
       if (it.product.originalPrice && it.product.originalPrice > it.product.price) {
         savings += (it.product.originalPrice - it.product.price) * it.quantity;
       }
     });
     return savings;
-  }, [cartList]);
+  }, [activeCheckoutItems]);
 
   const handleCopyOrderId = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -222,8 +312,8 @@ function CheckoutContent() {
   const handlePlaceOrder = async () => {
     setErrorMessage(null);
 
-    if (cartList.length === 0) {
-      setErrorMessage("Your cart is empty. Please add items before checking out.");
+    if (activeCheckoutItems.length === 0) {
+      setErrorMessage("Your cart has no items for this store. Please select another store or add items.");
       return;
     }
 
@@ -247,14 +337,14 @@ function CheckoutContent() {
 
     if (!token && !isAuthenticated) {
       // Guide user to login while preserving their cart
-      router.push("/login?redirect=/checkout");
+      router.push(`/login?redirect=${encodeURIComponent(`/checkout?vendorId=${selectedVendorId}`)}`);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const itemsPayload = cartList.map((item) => ({
+      const itemsPayload = activeCheckoutItems.map((item) => ({
         productId: item.product._id,
         quantity: item.quantity,
         price: item.product.price,
@@ -291,9 +381,10 @@ function CheckoutContent() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Order successfully created on backend!
-        // Clear both Redux state and backend cart
-        dispatch(clearCart());
+        // Order successfully created for this vendor!
+        // Clear this vendor's items from the cart
+        const placedProductIds = activeCheckoutItems.map((it) => it.product._id);
+        dispatch(clearVendorCart(placedProductIds));
         setConfirmedOrder(data.data || { orderNumber: orderId, totalAmount: grandTotal });
       } else {
         setErrorMessage(
@@ -343,11 +434,11 @@ function CheckoutContent() {
               Order Confirmed & Sent to Store!
             </span>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">
               Thank You For Your Order!
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm md:text-base text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
               Your kitchen essentials are being packed at the nearest BhansaMart hub. Our delivery partner will arrive at your doorstep in{" "}
               <strong className="text-emerald-700 font-bold">15-25 minutes</strong>.
             </p>
@@ -392,6 +483,30 @@ function CheckoutContent() {
                 </span>
               </div>
             </div>
+
+            {/* If there are more store carts remaining */}
+            {remainingVendorGroups.length > 0 && (
+              <div className="my-5 p-4 bg-amber-50 rounded-2xl border border-amber-200 text-left">
+                <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs sm:text-sm">
+                  <Store className="w-4 h-4 text-amber-700" />
+                  <span>Remaining Shipment ({remainingVendorGroups[0].itemCount} items)</span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-amber-700 mt-1 mb-3">
+                  You still have items from <strong>{remainingVendorGroups[0].vendorName}</strong> in your cart. Each store order is packed and dispatched separately in 15-25 minutes.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmedOrder(null);
+                    setSelectedVendorId(remainingVendorGroups[0].vendorId);
+                  }}
+                  className="w-full py-2.5 px-4 bg-[#0C831F] hover:bg-[#0a6f1a] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Checkout {remainingVendorGroups[0].vendorName} Shipment (₹{remainingVendorGroups[0].grandTotal})</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
@@ -450,22 +565,24 @@ function CheckoutContent() {
       <Header />
 
       {/* ── 2. Breadcrumb Navigation Bar ── */}
-      <div className="bg-white border-b border-slate-200/80 sticky top-20 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        <div className="w-[94%] max-w-7xl mx-auto py-3 px-2 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="bg-white border-b border-slate-200/80 relative lg:sticky lg:top-20 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="w-[94%] max-w-7xl mx-auto py-2.5 sm:py-3 px-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link
               href="/"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition shrink-0"
               title="Return to shopping"
             >
               <ArrowLeft className="w-5 h-5 text-slate-800" />
             </Link>
-            <div>
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight truncate">
                 Checkout & Review
               </h1>
-              <p className="text-[11px] text-slate-500 leading-none mt-0.5">
-                {totalCount} item{totalCount > 1 ? "s" : ""} in order
+              <p className="text-[11px] sm:text-xs text-slate-500 leading-none mt-0.5">
+                {vendorGroups.length > 1
+                  ? `${activeItemCount} items (${activeVendorGroup?.vendorName || "Store"}) • ${totalCount} items in cart`
+                  : `${totalCount} item${totalCount > 1 ? "s" : ""} in order`}
               </p>
             </div>
           </div>
@@ -474,7 +591,7 @@ function CheckoutContent() {
           <button
             type="button"
             onClick={handleCopyOrderId}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-semibold px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer"
+            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-semibold px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer shrink-0"
             title="Click to copy Order ID"
           >
             <span>ID: {orderId}</span>
@@ -488,12 +605,61 @@ function CheckoutContent() {
       </div>
 
       {/* ── 3. Main Split Content ── */}
-      <main className="flex-1 w-[94%] max-w-7xl mx-auto py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <main className="flex-1 w-[94%] max-w-7xl mx-auto py-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
           
           {/* ════════ LEFT COLUMN: Address, Items & Payment (8 Cols) ════════ */}
-          <div className="lg:col-span-7 xl:col-span-8 space-y-5">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4 sm:space-y-5">
             
+            {/* Multi-Vendor Store Selector Banner */}
+            {vendorGroups.length > 1 && (
+              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-emerald-200/90 bg-emerald-50/20 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2.5 border-b border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                      Multi-Store Cart ({vendorGroups.length} Stores)
+                    </h3>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      Select Store
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Dispatched separately in 15-25 mins from each hub.
+                  </p>
+                </div>
+
+                {/* Store Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pt-2.5 no-scrollbar touch-pan-x">
+                  {vendorGroups.map((vg) => {
+                    const isActive = vg.vendorId === (activeVendorGroup?.vendorId || "");
+                    return (
+                      <button
+                        key={vg.vendorId}
+                        type="button"
+                        onClick={() => setSelectedVendorId(vg.vendorId)}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          isActive
+                            ? "bg-[#0C831F] text-white shadow-xs scale-102"
+                            : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Store className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[130px] sm:max-w-xs">{vg.vendorName}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                            isActive ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-800"
+                          }`}
+                        >
+                          {vg.itemCount} • ₹{vg.grandTotal}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* 1. Superfast Express Delivery Guarantee Banner */}
             <div className="bg-linear-to-r from-emerald-600 to-[#0C831F] rounded-2xl p-4 text-white flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-3">
@@ -501,13 +667,13 @@ function CheckoutContent() {
                   <Clock className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold flex items-center gap-1.5">
+                  <h3 className="text-xs sm:text-sm md:text-base font-extrabold flex items-center gap-1.5">
                     <span>15-25 Mins Express Delivery</span>
                     <span className="bg-white/25 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
                       Guaranteed
                     </span>
                   </h3>
-                  <p className="text-[11px] text-emerald-50 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-emerald-50 mt-0.5">
                     Dispatched from the nearest verified BhansaMart hub directly to your door.
                   </p>
                 </div>
@@ -522,10 +688,10 @@ function CheckoutContent() {
                     <MapPin className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    <h2 className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900">
                       Delivery Address
                     </h2>
-                    <p className="text-[11px] text-slate-500 leading-none mt-0.5">
+                    <p className="text-[11px] sm:text-xs text-slate-500 leading-none mt-0.5">
                       Confirm where you want your order delivered
                     </p>
                   </div>
@@ -608,7 +774,7 @@ function CheckoutContent() {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 9868686868"
+                      placeholder="10-digit mobile number"
                       required
                       className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition font-medium"
                     />
@@ -647,11 +813,13 @@ function CheckoutContent() {
                     <ShoppingBag className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      Order Items ({totalCount})
+                    <h2 className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900">
+                      {activeVendorGroup ? `${activeVendorGroup.vendorName} Shipment` : "Order Items"} ({activeItemCount})
                     </h2>
-                    <p className="text-[11px] text-slate-500 leading-none mt-0.5">
-                      Review products and adjust quantities
+                    <p className="text-[11px] sm:text-xs text-slate-500 leading-none mt-0.5">
+                      {vendorGroups.length > 1
+                        ? `Only items from ${activeVendorGroup?.vendorName || "selected store"} are checked out in this shipment`
+                        : "Review products and adjust quantities"}
                     </p>
                   </div>
                 </div>
@@ -659,33 +827,27 @@ function CheckoutContent() {
 
               {/* Items List */}
               <div className="divide-y divide-slate-100">
-                {cartList.map(({ product, quantity }) => (
+                {activeCheckoutItems.map(({ product, quantity }) => (
                   <div
                     key={product._id}
                     className="py-3 flex items-center justify-between gap-3 group"
                   >
                     {/* Image & Title */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-14 h-14 bg-slate-50 border border-slate-200/70 rounded-xl p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={getProductImg(product)}
-                          alt={product.name}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
+                      <CheckoutProductImage product={product} />
                       <div className="min-w-0">
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                        <h4 className="text-xs sm:text-sm md:text-base font-bold text-slate-900 truncate">
                           {product.name}
                         </h4>
-                        <span className="text-[11px] text-slate-500 block">
+                        <span className="text-[11px] sm:text-xs text-slate-500 block">
                           {product.unit || "1 unit"}
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs font-black text-slate-900">
+                          <span className="text-xs sm:text-sm font-black text-slate-900">
                             ₹{product.price}
                           </span>
                           {product.originalPrice && product.originalPrice > product.price ? (
-                            <span className="text-[10px] text-slate-400 line-through">
+                            <span className="text-[10px] sm:text-[11px] text-slate-400 line-through">
                               ₹{product.originalPrice}
                             </span>
                           ) : null}
@@ -735,10 +897,10 @@ function CheckoutContent() {
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    <h2 className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900">
                       Select Payment Method
                     </h2>
-                    <p className="text-[11px] text-slate-500 leading-none mt-0.5">
+                    <p className="text-[11px] sm:text-xs text-slate-500 leading-none mt-0.5">
                       Choose your preferred payment method
                     </p>
                   </div>
@@ -775,7 +937,7 @@ function CheckoutContent() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs sm:text-sm font-extrabold text-slate-900">
+                            <span className="text-xs sm:text-sm md:text-base font-extrabold text-slate-900">
                               {method.displayName}
                             </span>
                             {method.methodKey === "cod" ? (
@@ -784,7 +946,7 @@ function CheckoutContent() {
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                          <p className="text-[11px] sm:text-xs text-slate-500 leading-tight mt-0.5">
                             {method.instructions || "Safe and authenticated checkout"}
                           </p>
                         </div>
@@ -810,19 +972,26 @@ function CheckoutContent() {
           </div>
 
           {/* ════════ RIGHT COLUMN: Bill Summary & Place Order CTA (4 Cols) ════════ */}
-          <div className="lg:col-span-5 xl:col-span-4 space-y-4 sticky top-36">
+          <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-36 static">
             
             {/* Bill Details Summary Card */}
             <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
-              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100">
-                Bill Summary
-              </h3>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900">
+                  Bill Summary
+                </h3>
+                {activeVendorGroup && vendorGroups.length > 1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 truncate max-w-[150px]">
+                    {activeVendorGroup.vendorName}
+                  </span>
+                )}
+              </div>
 
-              <div className="space-y-2.5 text-xs">
+              <div className="space-y-2.5 text-xs sm:text-sm">
                 {/* Items Total */}
                 <div className="flex items-center justify-between text-slate-600">
                   <span>Items total</span>
-                  <span className="font-bold text-slate-900">₹{totalPrice}</span>
+                  <span className="font-bold text-slate-900">₹{activeSubtotal}</span>
                 </div>
 
                 {/* Delivery Charge */}
@@ -860,14 +1029,14 @@ function CheckoutContent() {
                 {/* Grand Total */}
                 <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-black text-slate-900 block leading-tight">
+                    <span className="text-sm sm:text-base font-black text-slate-900 block leading-tight">
                       Grand Total
                     </span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] sm:text-[11px] text-slate-400">
                       Inclusive of all taxes
                     </span>
                   </div>
-                  <span className="text-xl font-black text-slate-900">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900">
                     ₹{grandTotal}
                   </span>
                 </div>
@@ -886,7 +1055,7 @@ function CheckoutContent() {
                 type="button"
                 onClick={handlePlaceOrder}
                 disabled={isSubmitting}
-                className="w-full py-3.5 px-4 bg-[#0C831F] hover:bg-[#0a6f1a] active:scale-[0.99] text-white font-extrabold text-sm rounded-xl shadow-lg transition flex items-center justify-between cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none"
+                className="w-full py-3.5 px-4 bg-[#0C831F] hover:bg-[#0a6f1a] active:scale-[0.99] text-white font-extrabold text-xs sm:text-sm md:text-base rounded-xl shadow-lg transition flex items-center justify-between cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none"
               >
                 <div className="flex flex-col text-left">
                   <span className="text-xs uppercase tracking-wider text-emerald-100 font-bold">

@@ -299,7 +299,7 @@ function OrderDetailsView() {
       </div>
 
       {/* Sticky action bar — app: STICKY BOTTOM ACTION BAR */}
-      <div className="sticky bottom-0 z-20 mt-6 -mx-4 md:-mx-6 lg:-mx-8 bg-white/95 backdrop-blur border-t border-slate-200 px-4 md:px-6 lg:px-8 py-3">
+      <div className="sticky bottom-0 z-20 mt-6 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 bg-white/95 backdrop-blur border-t border-slate-200 px-3 sm:px-4 md:px-6 lg:px-8 py-3">
         <div className="flex flex-wrap items-center justify-end gap-2">
           {order.orderStatus === "PLACED" &&
             (declining ? (

@@ -26,7 +26,7 @@ export function PageHeader({
           </Link>
         )}
         <div className="min-w-0">
-          <h1 className="text-xl md:text-2xl font-extrabold text-vendor-dark tracking-tight truncate">{title}</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-vendor-dark tracking-tight break-words sm:truncate">{title}</h1>
           {subtitle && <p className="text-xs md:text-sm text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
       </div>
@@ -39,7 +39,7 @@ export function Card({ children, className = "", title, action }: { children: Re
   return (
     <section className={`bg-white rounded-2xl border border-slate-100 shadow-sm ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-5 pt-4 pb-3 border-b border-slate-100">
           {title && <h2 className="text-sm font-extrabold text-vendor-dark">{title}</h2>}
           {action}
         </div>
@@ -74,14 +74,14 @@ export function StatCard({
     slate: "bg-slate-100 text-slate-600",
   };
   const body = (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 h-full flex items-start justify-between gap-3 hover:border-vendor-200 transition-colors">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 sm:p-4 h-full flex items-start justify-between gap-2 sm:gap-3 hover:border-vendor-200 transition-colors">
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
-        <p className="mt-1.5 text-xl md:text-2xl font-extrabold text-slate-900 truncate">{value}</p>
+        <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide sm:tracking-wider text-slate-500">{label}</p>
+        <p className="mt-1.5 text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 break-words leading-tight">{value}</p>
         {sub && <div className="mt-1 text-[11px] text-slate-500">{sub}</div>}
       </div>
       {Icon && (
-        <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tones[tone]}`}>
+        <span className={`hidden min-[420px]:flex w-8 h-8 sm:w-10 sm:h-10 rounded-xl items-center justify-center shrink-0 ${tones[tone]}`}>
           <Icon className="w-5 h-5" />
         </span>
       )}
@@ -214,17 +214,17 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-[55] bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" onMouseDown={onClose}>
       <div
-        className={`w-full ${wide ? "sm:max-w-2xl" : "sm:max-w-md"} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col`}
+        className={`w-full ${wide ? "sm:max-w-2xl" : "sm:max-w-md"} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h2 className="text-base font-extrabold text-vendor-dark">{title}</h2>
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
+          <h2 className="text-base font-extrabold text-vendor-dark min-w-0 break-words">{title}</h2>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-5 overflow-y-auto">{children}</div>
-        {footer && <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">{footer}</div>}
+        <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain">{children}</div>
+        {footer && <div className="px-4 sm:px-5 py-4 border-t border-slate-100 flex flex-wrap justify-end gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">{footer}</div>}
       </div>
     </div>
   );

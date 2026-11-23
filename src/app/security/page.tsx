@@ -13,9 +13,9 @@ export default function SecurityPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       <Header />
 
-      <main className="flex-1 w-[92%] max-w-4xl mx-auto py-10 sm:py-14">
+      <main className="flex-1 w-[94%] sm:w-[92%] max-w-4xl mx-auto py-6 sm:py-10 md:py-14">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 sm:mb-6">
           <Link href="/" className="hover:text-emerald-700 flex items-center gap-1 font-semibold">
             <ArrowLeft className="w-3.5 h-3.5" />
             Home
@@ -25,22 +25,22 @@ export default function SecurityPage() {
         </div>
 
         {/* Hero Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-xs mb-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-[#0C831F]">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
                 Trust &amp; Security at BhansaMart
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 Protecting your account, payments, and personal information at every step
               </p>
             </div>
           </div>
 
-          <p className="text-sm text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed pt-3 border-t border-slate-100">
             At BhansaMart, we believe shopping for fresh groceries should be completely worry-free.
             We employ bank-grade encryption, certified payment gateways, and rigorous quality standards
             to ensure that every order is safe, confidential, and tamper-proof.

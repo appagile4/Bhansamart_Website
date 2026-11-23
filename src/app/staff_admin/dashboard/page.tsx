@@ -37,7 +37,28 @@ const TIMEFRAMES = [
 export default function StaffHomePage() {
   const session = useStaffAdminSession();
   const [timeframe, setTimeframe] = useState("today");
-  const [vendorId, setVendorId] = useState("");
+  const [vendorId, setVendorId] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("vendorId") || localStorage.getItem("staff_scope_vendorId") || "";
+    }
+    return "";
+  });
+
+  const handleVendorChange = (newVendorId: string) => {
+    setVendorId(newVendorId);
+    if (typeof window !== "undefined") {
+      if (newVendorId) {
+        localStorage.setItem("staff_scope_vendorId", newVendorId);
+      } else {
+        localStorage.removeItem("staff_scope_vendorId");
+      }
+      const url = new URL(window.location.href);
+      if (newVendorId) url.searchParams.set("vendorId", newVendorId);
+      else url.searchParams.delete("vendorId");
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
   const [metric, setMetric] = useState<"sales" | "orders">("sales");
   const stores = useAsync(() => api.getAssignedStores(), "staff-stores");
   const q = useAsync(() => api.getStaffOverview({ timeframe, vendorId: vendorId || undefined }), `${timeframe}|${vendorId}`);
@@ -96,7 +117,7 @@ export default function StaffHomePage() {
               </button>
             ))}
           </div>
-          <select className={`${field} lg:w-72`} value={vendorId} onChange={(e) => setVendorId(e.target.value)} aria-label="Filter by store">
+          <select className={`${field} lg:w-72`} value={vendorId} onChange={(e) => handleVendorChange(e.target.value)} aria-label="Filter by store">
             <option value="">All assigned stores ({storeCount})</option>
             {(stores.data || []).map((v) => (
               <option key={v._id} value={v._id}>{v.storeName || v.businessDetails?.businessName || "Store"}</option>

@@ -3,12 +3,11 @@
 import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Filter, LayoutGrid, List, Package, PackagePlus,  RefreshCw, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, Package, PackagePlus, RefreshCw, Search, X } from "lucide-react";
 import * as api from "@/lib/seller/api";
 import { useAsync } from "@/lib/seller/useAsync";
 import type { SellerProduct } from "@/lib/seller/types";
 import { isLowStock, isOutOfStock, npr, productImage } from "@/lib/seller/format";
-import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
 import { EmptyState, ErrorBanner, LoadingBlock, PageHeader, btn, field, fieldLabel } from "@/components/vendor/ui";
 
 // app: SORT_OPTIONS + quick price chips
@@ -37,6 +36,7 @@ export default function ProductsPage() {
 function ProductsView() {
   const params = useSearchParams();
   const { data, error, loading, reload, setData } = useAsync(() => api.getMyProducts(), "products");
+  const catsQ = useAsync(() => api.getCategories(), "categories");
   const products = useMemo(() => data?.products || [], [data]);
 
   const [search, setSearch] = useState(params.get("search") || "");
@@ -49,12 +49,17 @@ function ProductsView() {
   const [maxPrice, setMaxPrice] = useState("");
   const [toggling, setToggling] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<20 | 30>(20);
 
   const categories = useMemo(() => {
-    const set = new Set<string>(MAIN_CATEGORY_NAMES);
+    const set = new Set<string>();
+    (catsQ.data || []).forEach((c) => {
+      if (c.name) set.add(c.name);
+    });
     products.forEach((p) => p.category && set.add(p.category));
     return ["All", ...Array.from(set)];
-  }, [products]);
+  }, [catsQ.data, products]);
 
   const activeFilters = (stock !== "all" ? 1 : 0) + (minPrice || maxPrice ? 1 : 0);
 
@@ -76,6 +81,15 @@ function ProductsView() {
     else if (sort === "alpha") list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
   }, [products, category, stock, minPrice, maxPrice, search, sort]);
+
+  const totalFiltered = visible.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return visible.slice(start, start + pageSize);
+  }, [visible, safePage, pageSize]);
 
   const toggleAvailable = async (p: SellerProduct) => {
     setToggling(p._id);
@@ -100,6 +114,7 @@ function ProductsView() {
     setMaxPrice("");
     setCategory("All");
     setSearch("");
+    setPage(1);
   };
 
   return (
@@ -125,42 +140,85 @@ function ProductsView() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search products, category, or SKU..."
             aria-label="Search products"
             className="w-full h-11 bg-white text-sm pl-10 pr-4 rounded-xl border border-slate-200 focus:border-vendor-dark focus:ring-2 focus:ring-vendor-100 focus:outline-none"
           />
         </div>
 
-        {/* Category chips */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setCategory(c)}
-              aria-pressed={category === c}
-              className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-bold border cursor-pointer ${
-                category === c ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-200 text-slate-600 hover:border-vendor-dark"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+        {/* Category chips or Skeleton Loading */}
+        {catsQ.loading && !catsQ.data ? (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1" aria-label="Loading categories...">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="shrink-0 h-8 rounded-full bg-slate-200/70 animate-pulse"
+                style={{ width: `${64 + (i % 5) * 18}px` }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  setCategory(c);
+                  setPage(1);
+                }}
+                aria-pressed={category === c}
+                className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-bold border cursor-pointer transition ${
+                  category === c ? "bg-vendor-dark border-vendor-dark text-white" : "bg-white border-slate-200 text-slate-600 hover:border-vendor-dark"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Controls bar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-            Sort by
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} className={`${field} h-9 w-auto pr-8`}>
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+              Sort by
+              <select
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value as SortId);
+                  setPage(1);
+                }}
+                className={`${field} h-9 w-auto pr-8`}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 whitespace-nowrap">
+              Show
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value) as 20 | 30);
+                  setPage(1);
+                }}
+                className={`${field} h-9 w-auto pr-8`}
+                aria-label="Products limit per page"
+              >
+                <option value={20}>20 per page</option>
+                <option value={30}>30 per page</option>
+              </select>
+            </label>
+          </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setFilterOpen((o) => !o)} className={`${btn.outline} h-9 relative`} aria-expanded={filterOpen}>
               <Filter className="w-4 h-4" /> Filter
@@ -270,15 +328,87 @@ function ProductsView() {
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {visible.map((p) => (
+            {paginatedProducts.map((p) => (
               <ProductTile key={p._id} p={p} toggling={toggling === p._id} onToggle={() => toggleAvailable(p)} />
             ))}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-100">
-            {visible.map((p) => (
+            {paginatedProducts.map((p) => (
               <ProductRow key={p._id} p={p} toggling={toggling === p._id} onToggle={() => toggleAvailable(p)} />
             ))}
+          </div>
+        )}
+
+        {/* ── Pagination Controls ── */}
+        {totalFiltered > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200">
+            <div className="text-xs text-slate-500 font-medium text-center sm:text-left">
+              Showing <span className="font-bold text-slate-800">{(safePage - 1) * pageSize + 1}</span> to{" "}
+              <span className="font-bold text-slate-800">{Math.min(safePage * pageSize, totalFiltered)}</span> of{" "}
+              <span className="font-bold text-slate-800">{totalFiltered}</span> products
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5" role="navigation" aria-label="Pagination">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`${btn.outline} h-9 px-3 gap-1 text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
+                  aria-label="Previous Page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Previous</span>
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                    .map((p, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev && p - prev > 1;
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && <span className="px-1 text-xs text-slate-400">…</span>}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPage(p);
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                            aria-current={safePage === p ? "page" : undefined}
+                            className={`w-9 h-9 rounded-xl text-xs font-bold transition cursor-pointer ${
+                              safePage === p
+                                ? "bg-vendor-dark text-white shadow-xs"
+                                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => {
+                    setPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`${btn.outline} h-9 px-3 gap-1 text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
+                  aria-label="Next Page"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

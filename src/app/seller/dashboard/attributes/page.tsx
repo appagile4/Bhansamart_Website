@@ -7,7 +7,6 @@ import { Clock, PackagePlus, Plus, Search, SlidersHorizontal, Sparkles, Tags } f
 import * as api from "@/lib/seller/api";
 import { useAsync } from "@/lib/seller/useAsync";
 import { formatDate } from "@/lib/seller/format";
-import { MAIN_CATEGORY_NAMES } from "@/lib/constants/categories";
 import BrandRequestModal from "@/components/vendor/BrandRequestModal";
 import AttributeModal from "@/components/vendor/AttributeModal";
 import { Card, EmptyState, ErrorBanner, LoadingBlock, PageHeader, SuccessBanner, Tabs, btn, field } from "@/components/vendor/ui";
@@ -38,6 +37,7 @@ function BrandsAttributesView() {
   const [attrModal, setAttrModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const catsQ = useAsync(() => api.getCategories(), "categories");
   const brands = useAsync(() => api.getBrands({ category: category || undefined, limit: 200 }), `b-${category}`);
   const attrs = useAsync(() => api.getAttributes({ category: category || undefined }), `a-${category}`);
   const requests = useAsync(() => api.getMyBrandRequests(), "requests");
@@ -85,12 +85,16 @@ function BrandsAttributesView() {
             <input className={`${field} pl-9`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${tab === "attributes" ? "attributes or values" : "brands"}…`} aria-label="Search" />
           </div>
           {tab !== "requests" && (
-            <select className={`${field} sm:w-64`} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
-              <option value="">All categories</option>
-              {MAIN_CATEGORY_NAMES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            catsQ.loading && !catsQ.data ? (
+              <div className="h-10 w-full sm:w-64 rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
+            ) : (
+              <select className={`${field} sm:w-64`} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+                <option value="">All categories</option>
+                {(catsQ.data || []).map((c) => (
+                  <option key={c._id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            )
           )}
         </div>
 
@@ -192,6 +196,7 @@ function BrandsAttributesView() {
         open={brandModal}
         onClose={() => setBrandModal(false)}
         defaultCategory={category || undefined}
+        availableCategories={(catsQ.data || []).map((c) => c.name)}
         onSubmitted={(m) => {
           setNotice(m);
           requests.reload();
@@ -203,6 +208,7 @@ function BrandsAttributesView() {
         open={attrModal}
         onClose={() => setAttrModal(false)}
         defaultCategory={category || undefined}
+        availableCategories={(catsQ.data || []).map((c) => c.name)}
         onSubmitted={(m) => {
           setNotice(m);
           attrs.reload();
