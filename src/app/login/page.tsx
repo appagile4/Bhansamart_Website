@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   RefreshCw,
   KeyRound,
   ShieldCheck,
@@ -36,8 +37,8 @@ export default function CustomerLoginPage() {
   const hydrated = useHydrated();
 
   // Authentication Mode
-  // primaryMode: "email" | "google"
-  const [primaryMode, setPrimaryMode] = useState<"email" | "google">("email");
+  // primaryMode: "choice" | "email"
+  const [primaryMode, setPrimaryMode] = useState<"choice" | "email">("choice");
   // emailMethod: "otp" | "password"
   const [emailMethod, setEmailMethod] = useState<"otp" | "password">("otp");
 
@@ -244,16 +245,20 @@ export default function CustomerLoginPage() {
           callback: handleGoogleCredentialResponse,
         });
 
-        const btnContainer = document.getElementById("google-signin-btn-container");
-        if (btnContainer) {
-          (window as any).google.accounts.id.renderButton(btnContainer, {
-            theme: "outline",
-            size: "large",
-            width: 380,
-            text: "continue_with",
-            shape: "pill",
-          });
-        }
+        const renderGsi = (id: string) => {
+          const btnContainer = document.getElementById(id);
+          if (btnContainer) {
+            (window as any).google.accounts.id.renderButton(btnContainer, {
+              theme: "outline",
+              size: "large",
+              width: 380,
+              text: "continue_with",
+              shape: "pill",
+            });
+          }
+        };
+        renderGsi("google-signin-btn-container");
+        renderGsi("google-signin-btn-container-email");
       } catch (err) {
         console.warn("Google Sign-In initialization:", err);
       }
@@ -275,16 +280,20 @@ export default function CustomerLoginPage() {
               client_id: clientId,
               callback: handleGoogleCredentialResponse,
             });
-            const btnContainer = document.getElementById("google-signin-btn-container");
-            if (btnContainer) {
-              (window as any).google.accounts.id.renderButton(btnContainer, {
-                theme: "outline",
-                size: "large",
-                width: 380,
-                text: "continue_with",
-                shape: "pill",
-              });
-            }
+            const renderGsi = (id: string) => {
+              const btnContainer = document.getElementById(id);
+              if (btnContainer) {
+                (window as any).google.accounts.id.renderButton(btnContainer, {
+                  theme: "outline",
+                  size: "large",
+                  width: 380,
+                  text: "continue_with",
+                  shape: "pill",
+                });
+              }
+            };
+            renderGsi("google-signin-btn-container");
+            renderGsi("google-signin-btn-container-email");
           }
         }}
       />
@@ -339,73 +348,47 @@ export default function CustomerLoginPage() {
             </div>
           ) : null}
 
-          {/* ── Primary Authentication Selector ── */}
-          <div className="w-full grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setPrimaryMode("email");
-                setFormError("");
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 ${
-                primaryMode === "email"
-                  ? "bg-white text-[#008080] shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Continue with Email
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPrimaryMode("google");
-                setFormError("");
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 ${
-                primaryMode === "google"
-                  ? "bg-white text-[#008080] shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.27 21.43 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.27 2.57 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              Continue with Google
-            </button>
-          </div>
+          {/* ── Primary Authentication Buttons (Stacked Pill UI in App Theme) ── */}
+          {primaryMode === "choice" && (
+            <div className="w-full flex flex-col gap-3.5 mb-6">
+              {/* Button 1: Continue with Email (Solid Teal Pill) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimaryMode("email");
+                  setFormError("");
+                }}
+                className="w-full py-3.5 px-6 bg-[#008080] hover:bg-[#006666] active:scale-[0.99] text-white font-bold text-sm sm:text-base rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+              >
+                <Mail className="w-5 h-5 text-white" />
+                <span>Continue with Email</span>
+              </button>
 
-          {/* ══════════════ 1. GOOGLE MODE ══════════════ */}
-          {primaryMode === "google" && (
-            <div className="w-full flex flex-col items-center py-4 space-y-4">
+              {/* Button 2: Continue with Google (White Pill with Outline) */}
               <div
                 id="google-signin-btn-container"
-                className="w-full flex justify-center min-h-[44px]"
+                className="w-full flex justify-center min-h-[46px]"
               />
-              <p className="text-[11px] text-slate-500 text-center max-w-[320px]">
-                Sign in with your verified Google account. If you are a new customer, your account will be created instantly without requiring a password.
-              </p>
             </div>
           )}
 
-          {/* ══════════════ 2. EMAIL MODE ══════════════ */}
+          {/* ══════════════ EMAIL MODE ══════════════ */}
           {primaryMode === "email" && (
             <div className="w-full">
+              {/* Back to all options */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimaryMode("choice");
+                  setOtpSent(false);
+                  setFormError("");
+                }}
+                className="flex items-center gap-2 text-xs font-bold text-[#008080] hover:underline mb-4 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>All sign-in options</span>
+              </button>
+
               {/* Email Sub-method Tabs */}
               <div className="flex border-b border-slate-200 mb-5">
                 <button
@@ -638,6 +621,18 @@ export default function CustomerLoginPage() {
                   </button>
                 </form>
               )}
+
+              {/* OR Divider & Alternate Google Login */}
+              <div className="w-full flex items-center my-5">
+                <div className="flex-1 border-t border-slate-200" />
+                <span className="px-3 text-xs text-slate-400 font-medium">OR</span>
+                <div className="flex-1 border-t border-slate-200" />
+              </div>
+
+              <div
+                id="google-signin-btn-container-email"
+                className="w-full flex justify-center min-h-[44px]"
+              />
             </div>
           )}
 
