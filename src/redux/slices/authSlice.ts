@@ -136,6 +136,187 @@ export const registerUser = createAsyncThunk(
   }
 );
 
+// ── Customer Auth Thunks ──────────────────────────────────────────────
+
+// Check customer email existence & available login options
+export const checkCustomerEmail = createAsyncThunk(
+  "auth/checkCustomerEmail",
+  async (email: string, { rejectWithValue }) => {
+    try {
+      const res = await fetch("/api/customer/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Unable to check email");
+      }
+      return data.data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error checking email"
+      );
+    }
+  }
+);
+
+// Send OTP to customer email
+export const sendCustomerOtp = createAsyncThunk(
+  "auth/sendCustomerOtp",
+  async (
+    { email, purpose }: { email: string; purpose?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await fetch("/api/customer/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, purpose }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Failed to send verification code");
+      }
+      return data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error sending OTP"
+      );
+    }
+  }
+);
+
+// Verify OTP (Direct login for existing customer, registration token for new)
+export const verifyCustomerOtp = createAsyncThunk(
+  "auth/verifyCustomerOtp",
+  async (
+    { email, otp, purpose }: { email: string; otp: string; purpose?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await fetch("/api/customer/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp, purpose }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Invalid verification code");
+      }
+
+      if (data.data?.token && typeof window !== "undefined") {
+        localStorage.setItem("bhansa_token", data.data.token);
+        localStorage.setItem("bhansa_user", JSON.stringify(data.data.user));
+      }
+
+      return data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error verifying OTP"
+      );
+    }
+  }
+);
+
+// Complete customer registration (mandatory password setup)
+export const completeCustomerRegistration = createAsyncThunk(
+  "auth/completeCustomerRegistration",
+  async (
+    payload: {
+      registrationToken: string;
+      password: string;
+      confirmPassword?: string;
+      name?: string;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await fetch("/api/customer/auth/complete-registration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Failed to complete registration");
+      }
+
+      if (data.data?.token && typeof window !== "undefined") {
+        localStorage.setItem("bhansa_token", data.data.token);
+        localStorage.setItem("bhansa_user", JSON.stringify(data.data.user));
+      }
+
+      return data.data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error completing registration"
+      );
+    }
+  }
+);
+
+// Customer Password Login
+export const loginCustomerPassword = createAsyncThunk(
+  "auth/loginCustomerPassword",
+  async (
+    credentials: { email: string; password: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await fetch("/api/customer/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Failed to log in");
+      }
+
+      if (data.data?.token && typeof window !== "undefined") {
+        localStorage.setItem("bhansa_token", data.data.token);
+        localStorage.setItem("bhansa_user", JSON.stringify(data.data.user));
+      }
+
+      return data.data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error logging in"
+      );
+    }
+  }
+);
+
+// Customer Google Login
+export const loginCustomerGoogle = createAsyncThunk(
+  "auth/loginCustomerGoogle",
+  async (idToken: string, { rejectWithValue }) => {
+    try {
+      const res = await fetch("/api/customer/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return rejectWithValue(data.message || "Google authentication failed");
+      }
+
+      if (data.data?.token && typeof window !== "undefined") {
+        localStorage.setItem("bhansa_token", data.data.token);
+        localStorage.setItem("bhansa_user", JSON.stringify(data.data.user));
+      }
+
+      return data.data;
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : "Network error during Google login"
+      );
+    }
+  }
+);
+
 // Async thunk for fetching current profile with token
 export const fetchCurrentUser = createAsyncThunk(
   "auth/fetchCurrentUser",
@@ -424,6 +605,80 @@ export const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = (action.payload as string) || "Registration failed";
+      });
+
+    // Customer Auth: Password Login
+    builder
+      .addCase(loginCustomerPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginCustomerPassword.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.successMessage = "Logged in successfully";
+      })
+      .addCase(loginCustomerPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Login failed";
+      });
+
+    // Customer Auth: Verify OTP
+    builder
+      .addCase(verifyCustomerOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyCustomerOtp.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload.data?.token) {
+          state.user = action.payload.data.user;
+          state.token = action.payload.data.token;
+          state.isAuthenticated = true;
+          state.successMessage = "Logged in successfully";
+        }
+      })
+      .addCase(verifyCustomerOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Verification failed";
+      });
+
+    // Customer Auth: Complete Registration
+    builder
+      .addCase(completeCustomerRegistration.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(completeCustomerRegistration.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.successMessage = "Account registered successfully";
+      })
+      .addCase(completeCustomerRegistration.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Registration failed";
+      });
+
+    // Customer Auth: Google Login
+    builder
+      .addCase(loginCustomerGoogle.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginCustomerGoogle.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.successMessage = "Signed in with Google successfully";
+      })
+      .addCase(loginCustomerGoogle.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || "Google authentication failed";
       });
 
     // Fetch Profile
