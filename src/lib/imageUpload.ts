@@ -39,6 +39,43 @@ export function validateImageFile(file: File): string | null {
   return null;
 }
 
+/**
+ * Minimum image size (pixels) per upload type. The backend enforces the same rule
+ * (middleware/imageSizeMiddleware.js); checking here tells the user before uploading.
+ */
+export const MIN_IMAGE_SIZE = {
+  product: { shorter: 600, longer: 1000, label: "Product photo" },
+  category: { shorter: 400, longer: 600, label: "Category image" },
+  qr: { shorter: 400, longer: 400, label: "Payment QR image" },
+  logo: { shorter: 300, longer: 300, label: "Logo" },
+} as const;
+
+export type ImageKind = keyof typeof MIN_IMAGE_SIZE;
+
+export const minSizeLabel = (kind: ImageKind) => `min ${MIN_IMAGE_SIZE[kind].longer}×${MIN_IMAGE_SIZE[kind].shorter} px`;
+
+/** Error message when the image is too small, otherwise null (also null if the browser can't read it, e.g. HEIC). */
+export async function imageSizeError(file: File, kind: ImageKind): Promise<string | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = url;
+    });
+    const min = MIN_IMAGE_SIZE[kind];
+    // SVGs scale freely, so their nominal size doesn't matter (same as the backend)
+    if (!width || !height || file.type === "image/svg+xml") return null;
+    if (Math.min(width, height) >= min.shorter && Math.max(width, height) >= min.longer) return null;
+    return `"${file.name}": ${min.label} is too small (${width}×${height} px). Please upload at least ${min.longer}×${min.shorter} px.`;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /** Splits a multi-file pick into accepted files and error messages for the rejected ones. */
 export function partitionImageFiles(files: File[]): { accepted: File[]; errors: string[] } {
   const accepted: File[] = [];

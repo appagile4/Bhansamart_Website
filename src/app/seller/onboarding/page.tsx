@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, validateImageFile } from "@/lib/imageUpload";
+import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, imageSizeError, minSizeLabel, validateImageFile } from "@/lib/imageUpload";
+import { useImageCrop } from "@/components/ImageCropper";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -255,6 +256,7 @@ export default function SellerOnboardingPage() {
   const [stepError, setStepError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const { cropImage, cropDialog } = useImageCrop();
   const hydrated = useRef(false);
 
   // Auth guard + load the latest vendor document
@@ -455,11 +457,13 @@ export default function SellerOnboardingPage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const invalid = validateImageFile(file);
+    const invalid = validateImageFile(file) || (await imageSizeError(file, "logo"));
     if (invalid) return setStepError(invalid);
     setStepError(null);
+    const cropped = await cropImage(file, "logo");
+    if (!cropped) return;
     setLogoUploading(true);
-    const result = await dispatch(uploadVendorLogo(file));
+    const result = await dispatch(uploadVendorLogo(cropped));
     setLogoUploading(false);
     if (uploadVendorLogo.fulfilled.match(result)) {
       set("brand", "brandLogo")(result.payload?.brandDetails?.brandLogo || "");
@@ -486,6 +490,7 @@ export default function SellerOnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans text-gray-900 flex flex-col">
+      {cropDialog}
       {/* Header — app: "Seller Registration Process" top nav with red logout pill */}
       <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-10">
         <Link href="/" className="relative block w-[132px] h-[40px] overflow-hidden" aria-label="BhansaMart home">
@@ -680,7 +685,7 @@ export default function SellerOnboardingPage() {
                     <input type="file" accept={IMAGE_ACCEPT} className="sr-only" disabled={logoUploading} onChange={handleLogoPick} />
                   </label>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {ALLOWED_IMAGE_LABEL} · max {MAX_IMAGE_LABEL}
+                    {ALLOWED_IMAGE_LABEL} · max {MAX_IMAGE_LABEL} · {minSizeLabel("logo")}
                   </p>
                 </div>
               </div>

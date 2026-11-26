@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Bike, Phone, Search, Star } from "lucide-react";
+import { AlertTriangle, Bike, Eye, MapPin, Phone, Search, Star } from "lucide-react";
 import * as api from "@/lib/admin/api";
 import { useAsync } from "@/lib/seller/useAsync";
+import { useConsole } from "@/lib/admin/console";
 import type { CodReconRow } from "@/lib/admin/types";
 import { initials, npr } from "@/lib/seller/format";
 import { Card, EmptyState, ErrorBanner, LoadingBlock, Modal, PageHeader, StatCard, SuccessBanner, Tabs, btn, field, fieldLabel } from "@/components/admin/ui";
@@ -31,6 +33,7 @@ export default function DeliveryPage() {
 }
 
 function FleetTab() {
+  const { base } = useConsole();
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [onlineOnly, setOnlineOnly] = useState(false);
@@ -68,29 +71,54 @@ function FleetTab() {
           {riders.map((r) => {
             const status = r.isBusy ? { t: "On delivery", c: "bg-amber-50 text-amber-700" } : r.isOnline ? { t: "Online", c: "bg-emerald-50 text-emerald-700" } : { t: "Offline", c: "bg-slate-100 text-slate-500" };
             return (
-              <article key={r._id} className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className="w-11 h-11 rounded-full bg-sky-100 text-sky-800 font-bold text-sm flex items-center justify-center overflow-hidden shrink-0">
-                    {r.profilePhoto ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.profilePhoto} alt="" className="w-full h-full object-cover" />
-                    ) : initials(r.name)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-slate-900 truncate">{r.name}</p>
-                    <p className="text-xs text-slate-500 flex items-center gap-1"><Phone className="w-3 h-3" /> {r.phone || "—"} · {r.vehicleNumber}</p>
+              <article key={r._id} className="bg-white rounded-2xl border border-slate-200/80 hover:border-sky-300 transition-all p-4 space-y-3 shadow-sm flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-11 h-11 rounded-full bg-sky-100 text-sky-800 font-bold text-sm flex items-center justify-center overflow-hidden shrink-0">
+                      {r.profilePhoto ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.profilePhoto} alt="" className="w-full h-full object-cover" />
+                      ) : initials(r.name)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <Link href={`${base}/delivery/${r._id}`} className="text-sm font-extrabold text-slate-900 truncate hover:text-[#0284C7] transition-colors block">
+                        {r.name}
+                      </Link>
+                      <p className="text-xs text-slate-500 flex items-center gap-1"><Phone className="w-3 h-3" /> {r.phone || "—"} · {r.vehicleNumber}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${status.c}`}>{status.t}</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${status.c}`}>{status.t}</span>
+
+                  {/* Primary Zone & City */}
+                  <div className="p-2 rounded-xl bg-sky-50/70 border border-sky-100 flex items-center justify-between gap-2 text-xs">
+                    <span className="text-sky-800 font-bold flex items-center gap-1 truncate">
+                      <MapPin className="w-3.5 h-3.5 text-[#0284C7] shrink-0" />
+                      <span className="truncate">Zone: {r.serviceArea || "Central Kathmandu"}</span>
+                    </span>
+                    <span className="text-[10px] font-semibold text-sky-600 shrink-0">
+                      {r.serviceCity || "Kathmandu"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold">{r.completedDeliveries}</p><p className="text-slate-500">Deliveries</p></div>
+                    <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold inline-flex items-center gap-1"><Star className="w-3 h-3 text-amber-500" />{(r.metrics?.rating ?? 5).toFixed(1)}</p><p className="text-slate-500">Rating</p></div>
+                    <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold truncate px-1">{npr(r.cashInHand)}</p><p className="text-slate-500">Cash in hand</p></div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    KYC {r.approvalStatus || "—"}
+                    {r.activeOrderId?.orderNumber ? ` · Active order ${r.activeOrderId.orderNumber} (${npr(r.activeOrderId.totalAmount)})` : ""}
+                  </p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold">{r.completedDeliveries}</p><p className="text-slate-500">Deliveries</p></div>
-                  <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold inline-flex items-center gap-1"><Star className="w-3 h-3 text-amber-500" />{(r.metrics?.rating ?? 5).toFixed(1)}</p><p className="text-slate-500">Rating</p></div>
-                  <div className="rounded-lg bg-slate-50 py-2"><p className="text-sm font-extrabold truncate px-1">{npr(r.cashInHand)}</p><p className="text-slate-500">Cash in hand</p></div>
+
+                <div className="pt-2 border-t border-slate-100 mt-2">
+                  <Link
+                    href={`${base}/delivery/${r._id}`}
+                    className={`${btn.outline} w-full h-8 text-xs justify-center font-bold`}
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View Profile & Zone
+                  </Link>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  KYC {r.approvalStatus || "—"}
-                  {r.activeOrderId?.orderNumber ? ` · Active order ${r.activeOrderId.orderNumber} (${npr(r.activeOrderId.totalAmount)})` : ""}
-                </p>
               </article>
             );
           })}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, isUnpreviewableImage, partitionImageFiles } from "@/lib/imageUpload";
+import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, imageSizeError, isUnpreviewableImage, partitionImageFiles } from "@/lib/imageUpload";
 import { useRouter } from "next/navigation";
 import { Check, ImagePlus, Plus, RefreshCw, Search, Sparkles, Trash2, X } from "lucide-react";
 import * as api from "@/lib/seller/api";
@@ -213,16 +213,20 @@ export default function ProductEditor({ initial }: { initial: SellerProduct | nu
     });
 
   const [photoErrors, setPhotoErrors] = useState<string[]>([]);
-  const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     // Shared rules: JPG / PNG / WebP / HEIC, max 5 MB each (same size limit as the backend)
-    const { accepted, errors } = partitionImageFiles(files);
+    const { accepted: validFiles, errors } = partitionImageFiles(files);
+    // Minimum pixel size (same rule as the backend)
+    const sizeErrors = await Promise.all(validFiles.map((f) => imageSizeError(f, "product")));
+    const accepted = validFiles.filter((_, i) => !sizeErrors[i]);
+    errors.push(...sizeErrors.filter((m): m is string => m !== null));
     const room = Math.max(0, MAX_PHOTOS - photos.length);
     if (accepted.length > room) errors.push(`Only ${MAX_PHOTOS} photos are allowed — ${accepted.length - room} photo(s) were not added.`);
     setPhotoErrors(errors);
     const added = accepted.slice(0, room);
-    setPhotos((cur) => [...cur, ...added.map((file) => ({ kind: "new" as const, file, preview: URL.createObjectURL(file) }))]);
+    setPhotos((cur) => [...cur, ...added.map((file) => ({ kind: "new" as const, file, preview: URL.createObjectURL(file) }))].slice(0, MAX_PHOTOS));
   };
 
   const removePhoto = (idx: number) => {

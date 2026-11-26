@@ -31,6 +31,8 @@ import {
   XCircle,
 } from "lucide-react";
 import * as api from "@/lib/admin/api";
+import { imageSizeError } from "@/lib/imageUpload";
+import { useImageCrop } from "@/components/ImageCropper";
 import { useAsync } from "@/lib/seller/useAsync";
 import type { AdminCategory, AdminProduct } from "@/lib/admin/types";
 import { ErrorBanner, LoadingBlock, Modal, SuccessBanner, btn, field } from "@/components/admin/ui";
@@ -484,20 +486,31 @@ function CategoryEditor({
   const [parent, setParent] = useState<string>(existing ? parentId(existing) || "" : ("parent" in initial && initial.parent) || "");
   const [active, setActive] = useState(existing ? existing.isActive !== false : true);
   const [uploading, setUploading] = useState(false);
+  const { cropImage, cropDialog } = useImageCrop();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const upload = async (file?: File) => {
     if (!file) return;
-    setUploading(true);
     setError(null);
+    const tooSmall = await imageSizeError(file, "category");
+    if (tooSmall) return setError(tooSmall);
+    const cropped = await cropImage(file, "category");
+    if (!cropped) return;
+    setUploading(true);
     try {
-      setImage(await api.uploadCategoryImage(file));
+      setImage(await api.uploadCategoryImage(cropped));
     } catch (e) {
       setError(api.errorText(e, "Image upload failed."));
     } finally {
       setUploading(false);
     }
+  };
+
+  const pickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets the same image be picked again after cancelling the crop
+    upload(file);
   };
 
   const save = async () => {
@@ -531,6 +544,8 @@ function CategoryEditor({
 
   const label = "block text-xs font-bold text-[#334155] mb-1.5";
   return (
+    <>
+    {cropDialog}
     <Modal
       open
       wide
@@ -623,7 +638,7 @@ function CategoryEditor({
             )}
             <label className="inline-flex items-center gap-1.5 h-10 px-3 rounded-lg bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold cursor-pointer shrink-0">
               {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />} Gallery
-              <input type="file" accept="image/*" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
+              <input type="file" accept="image/*" className="sr-only" onChange={pickFile} />
             </label>
           </div>
           <div className="mt-2">
@@ -649,7 +664,7 @@ function CategoryEditor({
               <label className="h-28 rounded-xl border border-dashed border-[#CBD5E1] bg-[#F1F5F9] flex flex-col items-center justify-center gap-1.5 cursor-pointer">
                 <ImagePlus className="w-6 h-6 text-[#94A3B8]" />
                 <span className="text-xs text-[#94A3B8]">Click to pick from gallery or enter URL above</span>
-                <input type="file" accept="image/*" className="sr-only" onChange={(e) => upload(e.target.files?.[0])} />
+                <input type="file" accept="image/*" className="sr-only" onChange={pickFile} />
               </label>
             )}
           </div>
@@ -676,6 +691,7 @@ function CategoryEditor({
         </div>
       </div>
     </Modal>
+    </>
   );
 }
 

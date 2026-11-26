@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, validateImageFile } from "@/lib/imageUpload";
+import { ALLOWED_IMAGE_LABEL, IMAGE_ACCEPT, MAX_IMAGE_LABEL, imageSizeError, minSizeLabel, validateImageFile } from "@/lib/imageUpload";
 import { BadgeCheck, ImagePlus, QrCode, Trash2 } from "lucide-react";
 import * as api from "@/lib/seller/api";
 import { useAsync } from "@/lib/seller/useAsync";
 import type { PaymentQrSettings } from "@/lib/seller/types";
 import { Card, ErrorBanner, LoadingBlock, PageHeader, SuccessBanner, btn, field, fieldLabel } from "@/components/vendor/ui";
 import { StorageFullHint } from "@/components/vendor/StorageWidgets";
+import { useImageCrop } from "@/components/ImageCropper";
 
 export default function PaymentQrPage() {
   const { data, error, loading, reload } = useAsync(() => api.getPaymentQr(), "qr");
@@ -34,6 +35,7 @@ function PaymentQrForm({
   const [accountName, setAccountName] = useState(initial.accountName);
   const [busy, setBusy] = useState<null | "save" | "upload" | "remove">(null);
   const [error, setError] = useState<string | null>(null);
+  const { cropImage, cropDialog } = useImageCrop();
 
   const run = async (kind: "save" | "upload" | "remove", fn: () => Promise<unknown>, success: string) => {
     setBusy(kind);
@@ -50,13 +52,15 @@ function PaymentQrForm({
     }
   };
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    const invalid = validateImageFile(f);
+    const invalid = validateImageFile(f) || (await imageSizeError(f, "qr"));
     if (invalid) return setError(invalid);
-    run("upload", () => api.uploadPaymentQrImage(f), "QR code uploaded. QR payments are now enabled for your store.");
+    const cropped = await cropImage(f, "qr");
+    if (!cropped) return;
+    run("upload", () => api.uploadPaymentQrImage(cropped), "QR code uploaded. QR payments are now enabled for your store.");
   };
 
   const save = () => {
@@ -73,6 +77,7 @@ function PaymentQrForm({
 
   return (
     <>
+      {cropDialog}
       <PageHeader backHref="/seller/dashboard/transactions" title="Store Payment QR & UPI" subtitle="Let customers pay your store directly by scanning your QR code at delivery." />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
@@ -111,9 +116,9 @@ function PaymentQrForm({
               )}
             </div>
             <div className="space-y-3 text-center sm:text-left">
-              <p className="text-xs text-slate-600">Upload the QR from your bank, eSewa, Khalti or Fonepay app. A clear, cropped screenshot works best.</p>
+              <p className="text-xs text-slate-600">Upload the QR from your bank, eSewa, Khalti or Fonepay app. You can crop a screenshot after choosing it.</p>
               <p className="text-[11px] text-slate-500">
-                {ALLOWED_IMAGE_LABEL} · max {MAX_IMAGE_LABEL}
+                {ALLOWED_IMAGE_LABEL} · max {MAX_IMAGE_LABEL} · {minSizeLabel("qr")}
               </p>
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                 <label className={`${btn.primary} ${busy === "upload" ? "opacity-60 pointer-events-none" : ""}`}>

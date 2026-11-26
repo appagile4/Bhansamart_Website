@@ -5,6 +5,7 @@ import {
   ALLOWED_IMAGE_LABEL,
   IMAGE_ACCEPT,
   MAX_IMAGE_LABEL,
+  imageSizeError,
   validateImageFile,
 } from "@/lib/imageUpload";
 import { ImagePlus, Search } from "lucide-react";
@@ -12,6 +13,7 @@ import * as api from "@/lib/seller/api";
 import type { BrandLogoResult } from "@/lib/seller/types";
 import { Modal, btn, field, fieldLabel } from "./ui";
 import { StorageFullHint } from "@/components/vendor/StorageWidgets";
+import { useImageCrop } from "@/components/ImageCropper";
 
 /** App: components/VendorComponent/AddBrandModal.tsx — request a new brand for admin approval */
 export default function BrandRequestModal({
@@ -36,6 +38,7 @@ export default function BrandRequestModal({
   );
   const [logoMode, setLogoMode] = useState<"custom" | "search">("custom");
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const { cropImage, cropDialog } = useImageCrop();
   const [logoUrl, setLogoUrl] = useState("");
   const [logoQuery, setLogoQuery] = useState("");
   const [results, setResults] = useState<BrandLogoResult[]>([]);
@@ -90,15 +93,17 @@ export default function BrandRequestModal({
     }
   };
 
-  const pickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    const invalid = validateImageFile(f);
+    const invalid = validateImageFile(f) || (await imageSizeError(f, "logo"));
     if (invalid) return setError(invalid);
     setError(null);
+    const cropped = await cropImage(f, "logo");
+    if (!cropped) return;
     setLogoUrl("");
-    setLogoFile(f);
+    setLogoFile(cropped);
   };
 
   const submit = async () => {
@@ -130,6 +135,8 @@ export default function BrandRequestModal({
   const preview = logoFile ? logoPreview : logoUrl;
 
   return (
+    <>
+    {cropDialog}
     <Modal
       open={open}
       title="Request a New Brand"
@@ -331,5 +338,6 @@ export default function BrandRequestModal({
         <StorageFullHint error={error} />
       </div>
     </Modal>
+    </>
   );
 }

@@ -433,12 +433,143 @@ export interface AdminRider {
   isBusy: boolean;
   cashInHand: number;
   vehicleNumber: string;
-  vehicleDetails?: { vehicleType?: string; registrationNumber?: string };
+  vehicleDetails?: { vehicleType?: string; registrationNumber?: string; licenseNumber?: string };
   completedDeliveries: number;
-  metrics?: { rating?: number; totalDeliveries?: number };
+  metrics?: { rating?: number; totalDeliveries?: number; ratingsCount?: number; acceptanceRate?: number };
   activeOrderId?: { orderNumber?: string; totalAmount?: number; orderStatus?: string } | null;
   address?: { city?: string };
-  user?: { isActive?: boolean } | null;
+  serviceCity?: string;
+  serviceArea?: string;
+  currentAddress?: { addressLine?: string; city?: string; state?: string; pincode?: string };
+  emergencyContact?: { name?: string; relationship?: string; phone?: string };
+  user?: { isActive?: boolean; name?: string; email?: string; phone?: string } | null;
+}
+
+export interface DeliveryPartnerDocument {
+  documentNumber?: string;
+  frontUrl?: string;
+  backUrl?: string;
+  status: "NOT_SUBMITTED" | "PENDING_VERIFICATION" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED" | "RESUBMISSION_REQUIRED" | "EXPIRED";
+  rejectionReason?: string;
+  reviewerComments?: string;
+  verifiedAt?: string;
+  expiryDate?: string;
+}
+
+export interface SecurityDepositLedgerItem {
+  _id: string;
+  amount: number;
+  type: "DEPOSIT_PAYMENT" | "DEPOSIT_REFUND" | "DEDUCTION";
+  status: "PENDING" | "PAID" | "REFUND_REQUESTED" | "REFUNDED" | "FAILED";
+  transactionId?: string;
+  gateway?: string;
+  adminRemarks?: string;
+  createdAt: string;
+}
+
+export interface DeliveryPartnerDetails {
+  _id: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  dateOfBirth?: string | null;
+  profilePhoto?: { url?: string; publicId?: string } | string;
+  currentAddress?: {
+    addressLine?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
+  serviceCity?: string;
+  serviceArea?: string;
+  emergencyContact?: {
+    name?: string;
+    relationship?: string;
+    phone?: string;
+  };
+  vehicleDetails?: {
+    vehicleType?: string;
+    registrationNumber?: string;
+    licenseNumber?: string;
+  };
+  bankDetails?: {
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    bankName?: string;
+    upiId?: string;
+  };
+  documents?: {
+    panCard?: DeliveryPartnerDocument;
+    aadhaarCard?: DeliveryPartnerDocument;
+    drivingLicense?: DeliveryPartnerDocument;
+    vehicleRc?: DeliveryPartnerDocument;
+  };
+  securityDeposit?: {
+    requiredAmount?: number;
+    paidAmount?: number;
+    status?: "PENDING" | "PAID" | "REFUND_REQUESTED" | "REFUNDED";
+    paidAt?: string;
+    transactionId?: string;
+    gateway?: string;
+  };
+  approvalStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED" | "DEACTIVATED";
+  adminRemarks?: string;
+  availability: "OFFLINE" | "ONLINE" | "BUSY";
+  currentLocation?: {
+    type?: string;
+    coordinates?: [number, number];
+  };
+  lastLocationUpdatedAt?: string;
+  activeOrderId?: {
+    _id?: string;
+    orderNumber?: string;
+    totalAmount?: number;
+    orderStatus?: string;
+    paymentMethod?: string;
+    paymentStatus?: string;
+    createdAt?: string;
+  } | null;
+  metrics?: {
+    totalDeliveries?: number;
+    rating?: number;
+    ratingsCount?: number;
+    acceptanceRate?: number;
+  };
+  wallet?: {
+    currentBalance?: number;
+    totalEarned?: number;
+  };
+  codCashInCustody?: number;
+  user?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    isActive?: boolean;
+    status?: string;
+  } | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DeliveryPartnerFullResponse {
+  success: boolean;
+  partner: DeliveryPartnerDetails;
+  canGoOnline: boolean;
+  allDocumentsVerified: boolean;
+  depositHistory: SecurityDepositLedgerItem[];
+  recentOrders?: Array<{
+    _id: string;
+    orderNumber: string;
+    totalAmount: number;
+    orderStatus: string;
+    paymentMethod?: string;
+    paymentStatus?: string;
+    createdAt: string;
+    vendor?: { businessDetails?: { businessName?: string }; name?: string } | null;
+    customer?: { name?: string; phone?: string } | null;
+  }>;
 }
 
 export interface CodReconRow {

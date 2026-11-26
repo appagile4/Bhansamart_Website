@@ -11,6 +11,8 @@ import type {
   MapRider,
   MapVendor,
   AdminRider,
+  DeliveryPartnerDetails,
+  DeliveryPartnerFullResponse,
   CodReconRow,
   CodReconSummary,
   ProductPerformance,
@@ -369,6 +371,31 @@ export async function getProductsAnalytics(query: { vendorId?: string; search?: 
 export async function getRiders(query: { search?: string; availability?: string; status?: string } = {}): Promise<AdminRider[]> {
   const r = await adminRequest<Ok<{ data: AdminRider[] }>>("/admin/delivery-boys", { query });
   return r.data || [];
+}
+
+export async function getDeliveryPartnerDetails(id: string): Promise<DeliveryPartnerFullResponse> {
+  const r = await adminRequest<DeliveryPartnerFullResponse>(`/admin/delivery/partners/${encodeURIComponent(id)}`);
+  return r;
+}
+
+export async function updateDeliveryPartnerApproval(
+  id: string,
+  input: { approvalStatus: string; adminRemarks?: string }
+): Promise<{ success: boolean; message?: string }> {
+  return adminRequest<{ success: boolean; message?: string }>(
+    `/admin/delivery/partners/${encodeURIComponent(id)}/approval`,
+    { method: "PATCH", json: input }
+  );
+}
+
+export async function reviewDeliveryPartnerDocument(
+  id: string,
+  input: { documentType: string; status: string; rejectionReason?: string; reviewerComments?: string }
+): Promise<{ success: boolean; message?: string }> {
+  return adminRequest<{ success: boolean; message?: string }>(
+    `/admin/delivery/partners/${encodeURIComponent(id)}/document`,
+    { method: "PATCH", json: input }
+  );
 }
 
 export async function getCodReconciliation(vendorId?: string): Promise<{ summary: CodReconSummary | null; reconciliation: CodReconRow[] }> {
