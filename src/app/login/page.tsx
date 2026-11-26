@@ -639,7 +639,7 @@ export default function CustomerLoginPage() {
           {/* ── Footer Info ── */}
           <div className="w-full border-t border-slate-100 mt-6 pt-4 text-center">
             <p className="text-[11px] text-slate-400">
-              BhansaMart &copy; {new Date().getFullYear()} &middot; Customer Portal
+              BhansaMart &copy; {hydrated ? new Date().getFullYear() : null} &middot; Customer Portal
             </p>
           </div>
         </div>
